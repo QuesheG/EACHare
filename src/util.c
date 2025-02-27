@@ -3,7 +3,7 @@
 
 //copy str2 into str1
 void cpy_str(char * str1, char * str2, int n) {
-    for(int i = 0; i < n && str2[i - 1] != '\0'; i++) {
+    for(int i = 0; i < n; i++) {
         str1[i] = str2[i];
     }
 }
@@ -11,8 +11,8 @@ void cpy_str(char * str1, char * str2, int n) {
 //size of str
 int size_str(char * str) {
     int i;
-    for(i = 0; str[i - 1] != '\0'; i++);
-    return i;
+    for(i = 0; str[i] != '\0'; i++);
+    return i + 1;
 }
 
 //receive a string and separate it in two
@@ -31,5 +31,6 @@ char ** separator(char *str, char tok) {
             return res;
         }
     }
+    free(res);
     return NULL;
 }

@@ -21,8 +21,7 @@ int main(int argc, char **argv) {
         printf("Error upon socket creation.\n");
         return 1;
     }
-
-    server;
+    
     char ** addr = separator(argv[1], ':');
     server.sin_addr.s_addr = inet_addr(addr[0]);
     server.sin_family = AF_INET;

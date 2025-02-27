@@ -3,9 +3,12 @@
 #ifdef WIN
 int init_win_sock(void) {
     WSADATA d;
-    if (WSAStartup(MAKEWORD(2, 2), &d)) {
+    int iResult = WSAStartup(MAKEWORD(2, 2), &d);
+    if (iResult != 0) {
         fprintf(stderr, "Failed to initialize. %d\n", WSAGetLastError());
+        return 1;
     }
+    return iResult;
 }
 #endif
 

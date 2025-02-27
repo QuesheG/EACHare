@@ -4,6 +4,9 @@
         "unistd.h": "c",
         "ws2tcpip.h": "c",
         "stdlib.h": "c",
-        "util.h": "c"
+        "util.h": "c",
+        "stdio.h": "c",
+        "winsock2.h": "c",
+        "winsock.h": "c"
     }
 }
