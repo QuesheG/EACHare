@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <sock.h>
 #include <util.h>
+#include <stdlib.h>
 #include <sys/types.h>
 // #include <pthread.h>
 

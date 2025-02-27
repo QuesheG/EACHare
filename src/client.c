@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <sock.h>
 #include <util.h>
+#include <stdlib.h>
 
 int main(int argc, char **argv) {
     if(argc != 2) { //FIXME: MUDAR AQUI PARA COMPRIMENTO CERTO;
