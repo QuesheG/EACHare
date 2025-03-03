@@ -12,6 +12,7 @@ int init_win_sock(void) {
 }
 #endif
 
+//standard function for socket creation
 void sock_close(SOCKET sock) {
     #ifdef WIN
         closesocket(sock);
@@ -19,4 +20,9 @@ void sock_close(SOCKET sock) {
     #else
         close(sock);
     #endif
+}
+
+//create peers
+create_peers(char **peers_ip, int peers_size) {
+    //ainda nem sei pra falar a real pqp
 }

@@ -24,9 +24,22 @@
 
 typedef struct sockaddr_in sockaddr_in;
 
+typedef enum status {
+    OFFLINE,
+    ONLINE
+} STATUS;
+
+typedef struct peer {
+    sockaddr_in con;
+    STATUS status;
+} peer;
+
 #ifdef WIN
 int init_win_sock(void);
 #endif
 
+//standard function for socket creation
 void sock_close(SOCKET sock);
+//create peers
+create_peers(char **peers_ip, int peers_size);
 #endif

@@ -1,5 +1,6 @@
 #include <util.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 //copy str2 into str1
 void cpy_str(char * str1, char * str2, int n) {
@@ -33,4 +34,14 @@ char ** separator(char *str, char tok) {
     }
     free(res);
     return NULL;
+}
+
+//read file with peers' ips and return them in text form
+char ** read_peers(FILE *f, int *len) {
+    char ** peers;
+    char ip[22] = {0}; //max ip size = 255.255.255.255:65535 -> 3+1+3+1+3+1+3+1+5 = 21 + null terminator
+    while(true) {
+        //read each line of file and put it in peers
+        fgets(ip, 22, f); //TODO: tratar \n
+    }
 }

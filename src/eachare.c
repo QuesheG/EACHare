@@ -8,8 +8,8 @@
 #define SIZE 1024
 
 int main(int argc, char **argv) {
-    if(argc != 2) { //FIXME: MUDAR AQUI PARA COMPRIMENTO CERTO;
-        printf("Wrong arguments!\nExpected: %s <ip>", argv[0]); //FIXME: CONSERTAR COM ARGUMENTOS CERTOS
+    if(argc != 4) { //FIXME: MUDAR AQUI PARA COMPRIMENTO CERTO;
+        printf("Wrong arguments!\nExpected: %s <ip>:<port> <neighbours.txt> <shareable_dir>", argv[0]);
         return 1;
     }
     #ifdef WIN
@@ -22,6 +22,7 @@ int main(int argc, char **argv) {
     socklen_t addrlen;
     char buf[SIZE] = {0};
     ssize_t valread;
+    char **addr;
 
     server = socket(AF_INET, SOCK_STREAM, 0);
     if(is_invalid_sock(server)) {
@@ -34,7 +35,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    char ** addr = separator(argv[1], ':');
+    addr = separator(argv[1], ':');
     address.sin_addr.s_addr = inet_addr(addr[0]);
     address.sin_family = AF_INET;
     address.sin_port = htons((unsigned short)(atoi(addr[1]))); //make string into int, then the int into short, then the short into a network byte order short
@@ -45,6 +46,11 @@ int main(int argc, char **argv) {
     }
 
     printf("Server created!\n");
+
+    //read file to get neighbours
+    int peers_size = 0;
+    char **peers_txt = read_peers(argv[2], &peers_size);
+    peer *peers = create_peers(peers_txt, peers_size);
 
     if(listen(server, 3) != 0) {
         printf("Error listening in socket\n");
