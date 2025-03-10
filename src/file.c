@@ -64,7 +64,6 @@ char ** get_dir_files(DIR *dir, int *len) {
         files[*len] = malloc(sizeof(char) * d_len);
         cpy_str(files[*len], dir_ent->d_name, d_len);
         *len += 1;
-        free(dir_ent);
     }
     return files;
 }

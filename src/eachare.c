@@ -64,6 +64,7 @@ int main(int argc, char **argv)
         return 1;
     }
     files = get_dir_files(shared_dir, &files_len);
+    closedir(shared_dir);
 
     // TODO: paralelizar o "escutamento" do socket e a checagem de comandos
     //  if(listen(server, 3) != 0) {
