@@ -1,5 +1,5 @@
-#ifndef SOCK
-#define SOCK
+#ifndef SOCK_H
+#define SOCK_H
 #ifdef _WIN32
     #ifndef _WIN32_WINNT
         #define _WIN32_WINNT 0x0600
@@ -19,8 +19,6 @@
     #define SOCKET int
     #define is_invalid_sock(x) (x < 0)
 #endif
-#include <stdio.h>
-#include <stdbool.h>
 
 typedef struct sockaddr_in sockaddr_in;
 
@@ -40,6 +38,10 @@ int init_win_sock(void);
 
 //standard function for socket creation
 void sock_close(SOCKET sock);
+void create_address(sockaddr_in *address, char *ip);
 //create peers
-create_peers(char **peers_ip, int peers_size);
+peer * create_peers(char **peers_ip, int peers_size);
+
+void show_peers(peer *peers, int peers_size);
+
 #endif
