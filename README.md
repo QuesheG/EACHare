@@ -1,6 +1,6 @@
-# DSC
+# EACHare
 
-DSC (Distributed System in C) is a file transfer project for USP's Distributed Systems course, it will feature
+EACHare is a file transfer project for USP's Distributed Systems course, it will feature
 
 - Peer to peer connection based on a known list at execution
 
