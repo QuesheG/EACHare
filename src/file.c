@@ -1,12 +1,12 @@
 #include <file.h>
-#include <str.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <dirent.h>
 #include <stdbool.h>
 
 //read file with peers' ips and return them in text form
-char ** read_peers(FILE *f, int *len) {
+char ** read_peers(FILE *f, size_t *len) {
     char ** peers = NULL;
     *len = 0;
     char ip[23] = {0}; //max ip size = 255.255.255.255:65535 -> 3+1+3+1+3+1+3+1+5 = 21 + possible newline + null terminator => 23
@@ -22,7 +22,7 @@ char ** read_peers(FILE *f, int *len) {
             return NULL;
         }
         peers = temp;
-        int ip_len = size_str(ip);
+        int ip_len = strlen(ip) + 1;
         if(ip_len > 0 && ip[ip_len - 2] == '\n') {
             ip[ip_len - 2] = '\0';
             ip_len -= 1;
@@ -36,14 +36,14 @@ char ** read_peers(FILE *f, int *len) {
             free(peers);
             return NULL;
         }
-        cpy_str(peers[*len], ip, ip_len);
+        strncpy(peers[*len], ip, ip_len);
         *len += 1;
     }
     return peers;
 }
 
 //store name of every file in directory
-char ** get_dir_files(DIR *dir, int *len) {
+char ** get_dir_files(DIR *dir, size_t *len) {
     char ** files = NULL;
     *len = 0;
     while(true) {
@@ -60,22 +60,17 @@ char ** get_dir_files(DIR *dir, int *len) {
             return NULL;
         }
         files = temp;
-        int d_len = size_str(dir_ent->d_name);
+        int d_len = strlen(dir_ent->d_name) + 1;
         files[*len] = malloc(sizeof(char) * d_len);
-        cpy_str(files[*len], dir_ent->d_name, d_len);
+        strncpy(files[*len], dir_ent->d_name, d_len);
         *len += 1;
     }
     return files;
 }
 
-void show_files(char **files, int file_len) {
-    printf("List files:\n");
-    printf("\t[0] Go back\n");
+//list filenames in memory
+void show_files(char **files, size_t file_len) {
     for(int i = 0; i < file_len; i++) {
-        printf("\t[%d] %s\n", i+1, files[i]);
+        printf("  %s\n", files[i]);
     }
-    int input;
-    scanf("%d", &input);
-    if(input == 0) return;
-    //TODO: get input and act upon the chosen file
 }

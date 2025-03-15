@@ -15,7 +15,7 @@ make
 
 ## Usage
 
-For now, all you have to do is, in your terminal, set up the peer with your ip and a port, choose a text file with your peers and a directory to share
+For now, all you have to do is, in your terminal, set up the peer with your ip and a port, choose a text file with your peers (one <ip>:<port> per line) and a directory to share (in the same folder as the peers file)
 ```console
 ./eachare <ip>:<port> <peers.txt> <share_folder>
 ```

@@ -5,11 +5,16 @@
 
 typedef struct dirent dirent;
 
-//read file with peers' ips and return them in text form
-char ** read_peers(FILE *f, int *len);
-//store name of every file in directory
-char ** get_dir_files(DIR *dir, int *len);
+//receive a string and separate it in two
+char ** separator(char *str, char tok);
 
-void show_files(char **files, int file_len);
+//read file with peers' ips and return them in text form
+char ** read_peers(FILE *f, size_t *len);
+
+//store name of every file in directory
+char ** get_dir_files(DIR *dir, size_t *len);
+
+//list filenames in memory
+void show_files(char **files, size_t file_len);
 
 #endif

@@ -20,12 +20,23 @@
     #define is_invalid_sock(x) (x < 0)
 #endif
 
+#include <stdbool.h>
+
+#define MSG_SIZE 50
+
 typedef struct sockaddr_in sockaddr_in;
 
 typedef enum status {
     OFFLINE,
     ONLINE
 } STATUS;
+
+typedef enum msg_type {
+    HELLO,
+    BYE,
+
+    UNEXPECTED_MSG_TYPE
+}MSG_TYPE;
 
 typedef struct peer {
     sockaddr_in con;
@@ -36,12 +47,16 @@ typedef struct peer {
 int init_win_sock(void);
 #endif
 
-//standard function for socket creation
-void sock_close(SOCKET sock);
-void create_address(sockaddr_in *address, char *ip);
-//create peers
-peer * create_peers(char **peers_ip, int peers_size);
+void sock_close(SOCKET sock); //standard function for socket creation
 
-void show_peers(peer *peers, int peers_size);
-
+void create_address(peer *address, char *ip); //create an IPv4 sockaddr_in
+bool create_server(SOCKET *server, sockaddr_in address, int opt); //bind a server to the socket
+peer * create_peers(char **peers_ip, size_t peers_size); //create peers
+void show_peers(peer server, SOCKET server_soc, int *clock, peer *peers, size_t peers_size); //print the peers in list
+char * build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *args); //create a message with the sender ip, its clock and the message type
+void send_message(char *msg, SOCKET server_soc, peer *neighbour, MSG_TYPE msg_type); //send a built message to an ONLINE known peer socket
+//TODO: add args when needed
+MSG_TYPE read_message(peer receiver, char *buf, int *clock, peer *sender); //read message, mark its sender and return the message type
+bool peer_in_list(peer a, peer * neighbours, size_t peers_size); //check if peer is in list of known peers
+void bye_peers(peer server, SOCKET server_soc, int *clock, peer *peers, size_t peers_size); //send a bye message to every peer in list
 #endif

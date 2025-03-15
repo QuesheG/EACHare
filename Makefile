@@ -12,11 +12,11 @@ FINAL = eachare
 CFLAGS = -Wall -I$(INC_DIR)
 
 ifeq ($(OS), Windows_NT)
-LDFLAGS = -lws2_32
-REMOVE = del
+LDFLAGS = -lws2_32 -lpthread
+REMOVE = rmdir /s /q
 else
-LDFLAGS = 
-REMOVE = rm
+LDFLAGS = -lpthread
+REMOVE = rm -rf
 endif
 
 $(FINAL): $(OBJ_FILES)
@@ -29,4 +29,4 @@ $(OBJ_DIR):
 	mkdir $@
 
 clean:
-	$(REMOVE) $(OBJ_FILES) $(FINAL)
+	$(REMOVE) $(OBJ_DIR)
