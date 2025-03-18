@@ -7,10 +7,16 @@
 #include <stdbool.h>
 #include <pthread.h>
 
+/*
+    TODO:
+        Att do clock a cada mensagem
+    FIXME:
+        Msg de bye
+*/
+
 bool should_quit = false;
 
 typedef struct listen_args {
-    SOCKET server_soc;
     peer server;
     peer *neighbours;
     size_t peers_size;
@@ -18,13 +24,19 @@ typedef struct listen_args {
 }listen_args;
 
 //routine for socket to listen to messages
-//TODO: definir semaforos para clock
+//TODO: definir semaforos para clock e should quit
 void * listen_socket(void *args) {
-    SOCKET server_soc = ((listen_args*)args)->server_soc;
     peer server = ((listen_args*)args)->server;
     peer *peers = ((listen_args*)args)->neighbours;
     size_t peers_size = ((listen_args*)args)->peers_size;
     int clock = *((listen_args*)args)->clock;
+
+    int opt = 1;
+    SOCKET server_soc;
+    if(!create_server(&server_soc, server.con, opt)) {
+        printf("Error creating server\n");
+        return NULL;
+    }
     while(!should_quit) {
         if(listen(server_soc, 3) != 0) {
             printf("Error listening in socket\n");
@@ -33,7 +45,7 @@ void * listen_socket(void *args) {
         socklen_t addrlen = sizeof(server.con);
     
         SOCKET n_sock = accept(server_soc, (struct sockaddr *)&server.con, &addrlen);
-        if(is_invalid_sock(n_sock)) {
+        if(is_invalid_sock(n_sock) && !should_quit) {
             printf("Error creating new socket\n");
         }
     
@@ -41,8 +53,8 @@ void * listen_socket(void *args) {
     
         ssize_t valread = recv(n_sock, buf, MSG_SIZE - 1, 0);
     
-        if(valread <= 0) {
-            printf("Error reading from client\n");
+        if(valread <= 0 && !should_quit) {
+            printf("Error reading from neighbour\n");
             continue;
         }
     
@@ -50,21 +62,24 @@ void * listen_socket(void *args) {
         printf("Mensagem recebida : \"%s\"", buf);
         peer sender;
         MSG_TYPE msg_type = read_message(server, buf, &clock, &sender);
+        int i = peer_in_list(sender, peers, peers_size);
         switch(msg_type) {
             case HELLO:
-                sender.status = ONLINE;
-                if(peer_in_list(sender, peers, peers_size)) {
-                    //append sender to known neighbours;
+                if(i >= 0) {
+                    peers[i].status = ONLINE;
+                    //TODO: append sender to known neighbours;
                     //update list in file
                 }
                 break;
             case BYE:
-                sender.status = OFFLINE;
+                peers[i].status = OFFLINE;
             default:
                 break;
         }
     }
+    sock_close(server_soc);
     pthread_exit(args);
+    return NULL;
 }
 
 int main(int argc, char **argv)
@@ -74,26 +89,30 @@ int main(int argc, char **argv)
         return 1;
     }
     #ifdef WIN
-    if (init_win_sock()) return 1;
+    if (init_win_sock()) {
+        printf("Error creating Windows socket\n");
+        return 1;
+    }
     #endif
 
-
-    SOCKET server_soc;
+    
     peer server;
     peer *peers;
-    int opt = 1, loc_clock = 0, comm;
+    int loc_clock = 0, comm;
     size_t peers_size = 0, files_len = 0;
     char **peers_txt, **files;
     pthread_t listener_thread;
 
 
-    // create serve
     create_address(&server, argv[1]);
-    if(!create_server(&server_soc, server.con, opt)) return 1;
-    
+
 
     // read file to get neighbours
     FILE *f = fopen(argv[2], "r");
+    if(!f) {
+        printf("Error opening file %s\n", argv[2]);
+        return 1;
+    }
     peers_txt = read_peers(f, &peers_size);
     peers = create_peers(peers_txt, peers_size);
     fclose(f);
@@ -113,7 +132,6 @@ int main(int argc, char **argv)
     closedir(shared_dir);
 
     listen_args *args = malloc(sizeof(listen_args));
-    args->server_soc = server_soc;
     args->server = server;
     args->neighbours = peers;
     args->peers_size = peers_size;
@@ -130,11 +148,15 @@ int main(int argc, char **argv)
             "\t[6] Change chuck size -> WIP\n"
             "\t[9] Exit\n"
             );
-        scanf("%d", &comm);
+        if(scanf("%d", &comm) != 1) {
+            while(getchar() != '\n');
+            printf("Unexpected command\n");
+            continue;
+        }
         switch (comm)
         {
         case 1:
-            show_peers(server, server_soc, &loc_clock, peers, peers_size);
+            show_peers(server, &loc_clock, peers, peers_size);
             break;
         case 3:
             show_files(files, files_len);
@@ -153,9 +175,8 @@ int main(int argc, char **argv)
         }
     }
 
-    sock_close(server_soc);
 
-    bye_peers(server, server_soc, &loc_clock, peers, peers_size);
+    bye_peers(server, &loc_clock, peers, peers_size);
     free(peers);
     free(args);
     free(files);

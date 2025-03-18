@@ -26,6 +26,20 @@ void sock_close(SOCKET sock) {
         close(sock);
     #endif
 }
+//standard function for socket error messages
+void show_soc_error() {
+    #ifdef _WIN32
+    wchar_t *s = NULL;
+    FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, 
+           NULL, WSAGetLastError(),
+           MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+           (LPWSTR)&s, 0, NULL);
+    fprintf(stderr, "%d: %S\n", WSAGetLastError(), s);
+    LocalFree(s);
+    #else
+    fprintf(stderr, "%d: %s\n", errno, strerror(errno));
+    #endif
+}
 
 //create an IPv4 sockaddr_in
 void create_address(peer *address, char *ip) {
@@ -45,11 +59,13 @@ bool create_server(SOCKET *server, sockaddr_in address, int opt) {
         return false;
     }
     if (setsockopt(*server, SOL_SOCKET, SO_REUSEADDR, (const char *)&opt, sizeof(opt)) != 0) {
-        printf("Error creating server");
+        printf("Error creating servern\n");
+        show_soc_error();
         return false;
     }
     if (bind(*server, (const struct sockaddr *)&address, sizeof(address)) != 0) {
-        printf("Error binding server");
+        printf("Error binding server\n");
+        show_soc_error();
         return false;
     }
     return true;
@@ -59,30 +75,26 @@ bool create_server(SOCKET *server, sockaddr_in address, int opt) {
 peer * create_peers(char **peers_ip, size_t peers_size) {
     peer * peers = malloc(sizeof(peer)* peers_size);
     for (int i = 0; i < peers_size; i++) {
+        printf("Adding new peer %s status OFFLINE\n", peers_ip[i]);
         create_address(&peers[i], peers_ip[i]);
         peers[i].status = OFFLINE;
-        printf("Adding new peer %s status OFFLINE\n", peers_ip[i]);
     }
-    for(int i = 0; i < peers_size; i++) {
-        free(peers_ip[i]);
-    }
-    free(peers_ip);
     return peers;
 }
 
 //print the peers in list
-void show_peers(peer server, SOCKET server_soc, int *clock, peer *peers, size_t peers_size) {
+void show_peers(peer server, int *clock, peer *peers, size_t peers_size) {
     printf("List peers:\n");
     printf("\t[0] Go back\n");
     for(int i = 0; i < peers_size; i++) {
-        printf("\t[%d] %s:%d\n", i+1, inet_ntoa(peers[i].con.sin_addr), peers[i].con.sin_port);
+        printf("\t[%d] %s:%u\n", i+1, inet_ntoa(peers[i].con.sin_addr), ntohs(peers[i].con.sin_port));
     }
     int input;
     scanf("%d", &input);
     if(input == 0) return;
     else if(input > 0 && input <= peers_size) {
         char *msg = build_message(server.con, *clock, HELLO, NULL);
-        send_message(msg, server_soc, &peers[input-1], HELLO);
+        send_message(msg, &(peers[input-1]), HELLO);
         free(msg);
     }
 }
@@ -96,10 +108,10 @@ char * build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *
     MESSAGE FORMATING: <sender_ip>:<sender_port> <sender_clock> <MSG_TYPE> [<ARGS...>]\n <- important newline
     */
     case HELLO:
-        sprintf(msg, "%s:%d %d HELLO\n", ip, (int)sender_ip.sin_port, clock);
+        sprintf(msg, "%s:%d %d HELLO\n", ip, (int)ntohs(sender_ip.sin_port), clock);
         break;
     case BYE:
-        sprintf(msg, "%s:%d %d BYE\n", ip, (int)sender_ip.sin_port, clock);
+        sprintf(msg, "%s:%d %d BYE\n", ip, (int)ntohs(sender_ip.sin_port), clock);
         break;
     default:    
         break;
@@ -108,14 +120,20 @@ char * build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *
 }
 
 //send a built message to an ONLINE known peer socket
-void send_message(char *msg, SOCKET server_soc, peer *neighbour, MSG_TYPE msg_type) {
-    if(connect(server_soc, (const struct sockaddr*)&(neighbour->con), sizeof(*neighbour)) < 0) {
-        printf("Error connecting to peer");
+void send_message(char *msg, peer *neighbour, MSG_TYPE msg_type) {
+    SOCKET server_soc = socket(AF_INET, SOCK_STREAM, 0);
+    if (is_invalid_sock(server_soc)) {
+        printf("Error creating socket");
+        return;
+    }
+    if(connect(server_soc, (const struct sockaddr*)&(neighbour->con), sizeof(neighbour->con)) != 0) {
+        printf("Error connecting to peer\n");
+        show_soc_error();
+        return;
     }
     size_t len = strlen(msg);
     if(send(server_soc, msg, len + 1, 0) == len) {
-        switch (msg_type)
-        {
+        switch (msg_type){
             case HELLO:
                 neighbour->status = ONLINE;
                 break;
@@ -123,39 +141,38 @@ void send_message(char *msg, SOCKET server_soc, peer *neighbour, MSG_TYPE msg_ty
                 break;
         }
     }
+    else {
+        show_soc_error();
+    }
 }
 
 //read message, mark its sender and return the message type
 MSG_TYPE read_message(peer receiver, char *buf, int *clock, peer *sender) { //TODO: add args when needed
-    char *cpy_msg1 = strdup(buf);
-    char *cpy_msg2 = strdup(cpy_msg1);
-    char *tok = strtok(cpy_msg1, " ");
-    create_address(sender, tok);
-    strtok(cpy_msg2, " ");
-    tok = strtok(NULL, " ");
-    //*clock = atoi(tok);
-    tok = strtok(NULL, " ");
-    if(strcmp(tok, "HELLO") == 0)
+    char *tok_ip = strtok(buf, " ");
+    // int clock = atoi(strtok(NULL, " "));
+    char *tok_msg = strtok(NULL, " ");
+    create_address(sender, tok_ip);
+    if(strcmp(tok_msg, "HELLO") == 0)
         return HELLO;
-    if(strcmp(tok, "BYE") == 0)
+    if(strcmp(tok_msg, "BYE") == 0)
         return BYE;
     return UNEXPECTED_MSG_TYPE; //TODO: TREAT ERRORS WHEN RECEIVING MSG
 }
 
 //check if peer is in list of known peers
-bool peer_in_list(peer a, peer * neighbours, size_t peers_size) {
+int peer_in_list(peer a, peer * neighbours, size_t peers_size) {
     for(int i = 0; i < peers_size; i++) {
-        if(strcmp(inet_ntoa(a.con.sin_addr), inet_ntoa(neighbours[i].con.sin_addr)) == 0 && (a.con.sin_port == neighbours[i].con.sin_port)) return true;
+        if(strcmp(inet_ntoa(a.con.sin_addr), inet_ntoa(neighbours[i].con.sin_addr)) == 0 && (a.con.sin_port == neighbours[i].con.sin_port)) return i;
     }
-    return false;
+    return -1;
 }
 
 //send a bye message to every peer in list
-void bye_peers(peer server, SOCKET server_soc, int *clock, peer *peers, size_t peers_size) {
+void bye_peers(peer server, int *clock, peer *peers, size_t peers_size) {
     for(int i = 0; i < peers_size; i++) {
         if(peers[i].status == ONLINE) {
             char *msg = build_message(server.con, *clock, BYE, NULL);
-            send_message(msg, server_soc, &peers[i], BYE);
+            send_message(msg, &peers[i], BYE);
         }
     }
 }

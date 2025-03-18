@@ -13,6 +13,11 @@ run
 make
 ```
 
+You can also use python to make a testing ground with multiple folders, each with its own known peers and a folder to hold files:
+```console
+python testing.py
+```
+
 ## Usage
 
 For now, all you have to do is, in your terminal, set up the peer with your ip and a port, choose a text file with your peers (one <ip>:<port> per line) and a directory to share (in the same folder as the peers file)
