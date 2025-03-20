@@ -87,7 +87,13 @@ void show_peers(peer server, int *clock, peer *peers, size_t peers_size) {
     printf("List peers:\n");
     printf("\t[0] Go back\n");
     for(int i = 0; i < peers_size; i++) {
-        printf("\t[%d] %s:%u\n", i+1, inet_ntoa(peers[i].con.sin_addr), ntohs(peers[i].con.sin_port));
+        printf("\t[%d] %s:%u", i+1, inet_ntoa(peers[i].con.sin_addr), ntohs(peers[i].con.sin_port));
+        if(peers[i].status == ONLINE) {
+            printf(" ONLINE\n");
+        }
+        else {
+            printf(" OFFLINE\n");
+        }
     }
     int input;
     scanf("%d", &input);
