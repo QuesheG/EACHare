@@ -35,5 +35,7 @@ os.chdir("..")
 for i in range(8):
     if platform.system() == "Windows":
         shutil.copy(os.getcwd()+"/eachare.exe", os.getcwd()+"/testing/g0"+str(i))
+        os.system("start ./testing/g0"+str(i)+"/eachare.exe 127.0.0.1:500"+str(i)+" ./testing/g0"+str(i)+"/peers.txt ./testing/g0"+str(i)+"/files")
     if platform.system() == "Linux":
         shutil.copy(os.getcwd()+"/eachare", os.getcwd()+"/testing/g0"+str(i))
+        # os.system("start ./testing/g0"+str(i)+"/eachare.exe 127.0.0.1:500"+str(i)+" ./testing/g0"+str(i)+"/peers.txt ./testing/g0"+str(i)+"/files")

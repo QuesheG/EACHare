@@ -10,6 +10,7 @@
 /*
     TODO:
         Att do clock a cada mensagem
+        Comm 2 Get Peers
     FIXME:
         Msg de bye
 */
@@ -76,6 +77,7 @@ void * listen_socket(void *args) {
             default:
                 break;
         }
+        sock_close(n_sock);
     }
     sock_close(server_soc);
     pthread_exit(args);

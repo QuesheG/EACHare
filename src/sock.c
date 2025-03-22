@@ -150,6 +150,7 @@ void send_message(char *msg, peer *neighbour, MSG_TYPE msg_type) {
     else {
         show_soc_error();
     }
+    sock_close(server_soc);
 }
 
 //read message, mark its sender and return the message type
