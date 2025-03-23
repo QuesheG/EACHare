@@ -11,6 +11,7 @@
     TODO:
         Att do clock a cada mensagem
         Comm 2 Get Peers
+        Mutex/Semaforo em clocks e peers_size e should_quit
     FIXME:
         Msg de bye
 */
@@ -21,7 +22,7 @@ typedef struct listen_args
 {
     peer server;
     peer *neighbours;
-    size_t peers_size;
+    size_t *peers_size;
     int *clock;
     char *file;
     DIR *dir;
@@ -33,8 +34,8 @@ void *listen_socket(void *args)
 {
     peer server = ((listen_args *)args)->server;
     peer *peers = ((listen_args *)args)->neighbours;
-    size_t peers_size = ((listen_args *)args)->peers_size;
-    int clock = *((listen_args *)args)->clock;
+    size_t *peers_size = ((listen_args *)args)->peers_size;
+    int *clock = ((listen_args *)args)->clock;
     char *file = ((listen_args *)args)->file;
     DIR *dir = ((listen_args *)args)->dir;
 
@@ -73,17 +74,17 @@ void *listen_socket(void *args)
         buf[valread] = '\0';
         printf("Mensagem recebida : \"%s\"", buf);
         peer sender;
-        MSG_TYPE msg_type = read_message(server, buf, &clock, &sender);
-        int i = peer_in_list(sender, peers, peers_size);
+        MSG_TYPE msg_type = read_message(server, buf, clock, &sender);
+        int i = peer_in_list(sender, peers, *peers_size);
         if (i < 0)
         {
             FILE *f = fopen(file, "a");
             fprintf(f, "%s:%d\n", inet_ntoa(peers[i].con.sin_addr), ntohs(peers[i].con.sin_port));
             fclose(f);
-            append_peer(peers, &peers_size, &sender);
-            peers[peers_size]
+            append_peer(peers, peers_size, &sender);
+            peers[*peers_size]
                 .status = ONLINE;
-            i = peers_size;
+            i = *peers_size;
         }
         switch (msg_type)
         {
@@ -120,7 +121,7 @@ int main(int argc, char **argv)
     peer server;
     peer *peers;
     int loc_clock = 0, comm;
-    size_t peers_size = 0, files_len = 0;
+    size_t *peers_size, files_len = 0;
     char **peers_txt, **files;
     pthread_t listener_thread;
 
@@ -133,10 +134,10 @@ int main(int argc, char **argv)
         printf("Error opening file %s\n", argv[2]);
         return 1;
     }
-    peers_txt = read_peers(f, &peers_size);
-    peers = create_peers(peers_txt, peers_size);
+    peers_txt = read_peers(f, peers_size);
+    peers = create_peers(peers_txt, *peers_size);
     fclose(f);
-    for (int i = 0; i < peers_size; i++)
+    for (int i = 0; i < *peers_size; i++)
     {
         free(peers_txt[i]);
     }
@@ -180,7 +181,7 @@ int main(int argc, char **argv)
         switch (comm)
         {
         case 1:
-            show_peers(server, &loc_clock, peers, peers_size);
+            show_peers(server, &loc_clock, peers, *peers_size);
             break;
         case 3:
             show_files(files, files_len);
@@ -199,7 +200,7 @@ int main(int argc, char **argv)
         }
     }
 
-    bye_peers(server, &loc_clock, peers, peers_size);
+    bye_peers(server, &loc_clock, peers, *peers_size);
     free(peers);
     free(args);
     free(files);

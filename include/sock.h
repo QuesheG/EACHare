@@ -24,13 +24,14 @@
 
 #define MSG_SIZE 50
 
+#define xstr(s) str(s)
+#define str(s) #s
+
 typedef enum status
 {
     OFFLINE,
     ONLINE
 } STATUS;
-
-char *status_string[] = {"OFFLINE", "ONLINE"};
 
 typedef enum msg_type
 {

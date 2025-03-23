@@ -30,6 +30,8 @@ the project has examples for both peers.txt and a share_folder
 
 implement clock
 
-implement com 2
+implement comm 2
 
-fix bye/get status on hllo
+fix bye/get status on hllo <- Fix ip
+
+Mutex/semaforo em clocks e peers_size e should_quit
