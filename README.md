@@ -28,10 +28,12 @@ the project has examples for both peers.txt and a share_folder
 
 ## TODO
 
+make string functions use const
+
 implement clock
 
 implement comm 2
 
-fix bye/get status on hllo <- Fix ip
+fix bye/get status on hllo
 
 Mutex/semaforo em clocks e peers_size e should_quit

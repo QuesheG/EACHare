@@ -98,16 +98,16 @@ peer *create_peers(char **peers_ip, size_t peers_size)
 }
 
 // append new peer
-void append_peer(peer *peers, size_t *peers_size, peer *new_peer)
+void append_peer(peer **peers, size_t *peers_size, peer new_peer)
 {
-    peer *new_peers = realloc(peers, sizeof(peer) * (*peers_size + 1));
+    peer *new_peers = realloc(*peers, (*peers_size + 1) * sizeof(peer));
     if (!new_peers)
     {
         perror("Failed to allocate memory");
         return;
     }
-    peers = new_peers;
-    peers[*peers_size] = *new_peer;
+    *peers = new_peers;
+    (*peers)[*peers_size] = new_peer;
     (*peers_size)++;
 }
 
@@ -119,8 +119,10 @@ void show_peers(peer server, int *clock, peer *peers, size_t peers_size)
     for (int i = 0; i < peers_size; i++)
     {
         printf("\t[%d] %s:%u ", i + 1, inet_ntoa(peers[i].con.sin_addr), ntohs(peers[i].con.sin_port));
-        if(peers[i].status == ONLINE) printf("ONLINE\n");
-        else printf("OFFLINE\n");
+        if (peers[i].status == ONLINE)
+            printf("ONLINE\n");
+        else
+            printf("OFFLINE\n");
     }
     int input;
     scanf("%d", &input);

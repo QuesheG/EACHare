@@ -19,6 +19,7 @@ char ** read_peers(FILE *f, size_t *len) {
                 free(peers[i]);
             }
             free(peers);
+            *len = 0;
             return NULL;
         }
         peers = temp;
@@ -34,6 +35,7 @@ char ** read_peers(FILE *f, size_t *len) {
                 free(peers[i]);
             }
             free(peers);
+            *len = 0;
             return NULL;
         }
         strncpy(peers[*len], ip, ip_len);
