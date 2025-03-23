@@ -206,14 +206,14 @@ void send_message(char *msg, peer *neighbour, MSG_TYPE msg_type)
 MSG_TYPE read_message(peer receiver, char *buf, int *clock, peer *sender)
 { // TODO: add args when needed
     char *tok_ip = strtok(buf, " ");
-    // int clock = atoi(strtok(NULL, " "));
-    char *tok_msg = strtok(NULL, " ");
+    int aclock = atoi(strtok(NULL, " "));
+    char *tok_msg = strtok(NULL, " "); //FIXME: QUANDO A MENSAGEM NÃO TEM ARGUMENTO, TOK_MSG FICA COM O TIPO DA MENSAGEM + \N, OQ RESULTA EM ERRO
     create_address(sender, tok_ip);
     if (strcmp(tok_msg, "HELLO") == 0)
         return HELLO;
     if (strcmp(tok_msg, "BYE") == 0)
         return BYE;
-    return UNEXPECTED_MSG_TYPE; // TODO: TREAT ERRORS WHEN RECEIVING MSG
+    return UNEXPECTED_MSG_TYPE;
 }
 
 // check if peer is in list of known peers

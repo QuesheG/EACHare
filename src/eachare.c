@@ -91,6 +91,7 @@ void *listen_socket(void *args)
             case BYE:
                 (*peers)[i].status = OFFLINE;
             default:
+                printf("Couldn't resolve message type\n");
                 break;
         }
         sock_close(n_sock);
