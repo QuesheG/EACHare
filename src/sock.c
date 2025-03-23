@@ -6,12 +6,10 @@
 #include <stdbool.h>
 
 #ifdef WIN
-int init_win_sock(void)
-{
+int init_win_sock(void) {
     WSADATA d;
     int iResult = WSAStartup(MAKEWORD(2, 2), &d);
-    if (iResult != 0)
-    {
+    if(iResult != 0) {
         fprintf(stderr, "Failed to initialize. %d\n", WSAGetLastError());
         return 1;
     }
@@ -20,8 +18,7 @@ int init_win_sock(void)
 #endif
 
 // standard function for socket creation
-void sock_close(SOCKET sock)
-{
+void sock_close(SOCKET sock) {
 #ifdef WIN
     closesocket(sock);
     return;
@@ -30,14 +27,13 @@ void sock_close(SOCKET sock)
 #endif
 }
 // standard function for socket error messages
-void show_soc_error()
-{
+void show_soc_error() {
 #ifdef _WIN32
     wchar_t *s = NULL;
     FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-                   NULL, WSAGetLastError(),
-                   MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                   (LPWSTR)&s, 0, NULL);
+        NULL, WSAGetLastError(),
+        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+        (LPWSTR)&s, 0, NULL);
     fprintf(stderr, "%d: %S\n", WSAGetLastError(), s);
     LocalFree(s);
 #else
@@ -46,8 +42,7 @@ void show_soc_error()
 }
 
 // create an IPv4 sockaddr_in
-void create_address(peer *address, char *ip)
-{
+void create_address(peer *address, char *ip) {
     char *tokip = strtok(ip, ":");
     char *tokport = strtok(NULL, ":");
     address->con.sin_addr.s_addr = inet_addr(tokip);
@@ -57,22 +52,18 @@ void create_address(peer *address, char *ip)
 }
 
 // bind a server to the socket
-bool create_server(SOCKET *server, sockaddr_in address, int opt)
-{
+bool create_server(SOCKET *server, sockaddr_in address, int opt) {
     *server = socket(AF_INET, SOCK_STREAM, 0);
-    if (is_invalid_sock(*server))
-    {
+    if(is_invalid_sock(*server)) {
         printf("Error upon socket creation.\n");
         return false;
     }
-    if (setsockopt(*server, SOL_SOCKET, SO_REUSEADDR, (const char *)&opt, sizeof(opt)) != 0)
-    {
+    if(setsockopt(*server, SOL_SOCKET, SO_REUSEADDR, (const char *)&opt, sizeof(opt)) != 0) {
         printf("Error creating servern\n");
         show_soc_error();
         return false;
     }
-    if (bind(*server, (const struct sockaddr *)&address, sizeof(address)) != 0)
-    {
+    if(bind(*server, (const struct sockaddr *)&address, sizeof(address)) != 0) {
         printf("Error binding server\n");
         show_soc_error();
         return false;
@@ -81,16 +72,13 @@ bool create_server(SOCKET *server, sockaddr_in address, int opt)
 }
 
 // create peers
-peer *create_peers(char **peers_ip, size_t peers_size)
-{
+peer *create_peers(char **peers_ip, size_t peers_size) {
     peer *peers = malloc(sizeof(peer) * peers_size);
-    if (!peers)
-    {
+    if(!peers) {
         perror("Failed to allocate memory");
         return NULL;
     }
-    for (int i = 0; i < peers_size; i++)
-    {
+    for(int i = 0; i < peers_size; i++) {
         printf("Adding new peer %s status OFFLINE\n", peers_ip[i]);
         create_address(&peers[i], peers_ip[i]);
     }
@@ -98,11 +86,9 @@ peer *create_peers(char **peers_ip, size_t peers_size)
 }
 
 // append new peer
-void append_peer(peer **peers, size_t *peers_size, peer new_peer)
-{
+void append_peer(peer **peers, size_t *peers_size, peer new_peer) {
     peer *new_peers = realloc(*peers, (*peers_size + 1) * sizeof(peer));
-    if (!new_peers)
-    {
+    if(!new_peers) {
         perror("Failed to allocate memory");
         return;
     }
@@ -112,24 +98,21 @@ void append_peer(peer **peers, size_t *peers_size, peer new_peer)
 }
 
 // print the peers in list
-void show_peers(peer server, int *clock, peer *peers, size_t peers_size)
-{
+void show_peers(peer server, int *clock, peer *peers, size_t peers_size) {
     printf("List peers:\n");
     printf("\t[0] Go back\n");
-    for (int i = 0; i < peers_size; i++)
-    {
+    for(int i = 0; i < peers_size; i++) {
         printf("\t[%d] %s:%u ", i + 1, inet_ntoa(peers[i].con.sin_addr), ntohs(peers[i].con.sin_port));
-        if (peers[i].status == ONLINE)
+        if(peers[i].status == ONLINE)
             printf("ONLINE\n");
         else
             printf("OFFLINE\n");
     }
     int input;
     scanf("%d", &input);
-    if (input == 0)
+    if(input == 0)
         return;
-    else if (input > 0 && input <= peers_size)
-    {
+    else if(input > 0 && input <= peers_size) {
         char *msg = build_message(server.con, *clock, HELLO, NULL);
         send_message(msg, &(peers[input - 1]), HELLO);
         free(msg);
@@ -137,15 +120,13 @@ void show_peers(peer server, int *clock, peer *peers, size_t peers_size)
 }
 
 // create a message with the sender ip, its clock and the message type
-char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *args)
-{
+char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *args) {
     char *ip = inet_ntoa(sender_ip.sin_addr);
     char *msg = malloc(sizeof(char) * MSG_SIZE);
-    switch (msg_type)
-    {
-    /*
-    MESSAGE FORMATING: <sender_ip>:<sender_port> <sender_clock> <MSG_TYPE> [<ARGS...>]\n <- important newline
-    */
+    switch(msg_type) {
+        /*
+        MESSAGE FORMATING: <sender_ip>:<sender_port> <sender_clock> <MSG_TYPE> [<ARGS...>]\n <- important newline
+        */
     case HELLO:
         sprintf(msg, "%s:%d %d HELLO\n", ip, (int)ntohs(sender_ip.sin_port), clock);
         break;
@@ -159,25 +140,20 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
 }
 
 // send a built message to an ONLINE known peer socket
-void send_message(char *msg, peer *neighbour, MSG_TYPE msg_type)
-{
+void send_message(char *msg, peer *neighbour, MSG_TYPE msg_type) {
     SOCKET server_soc = socket(AF_INET, SOCK_STREAM, 0);
-    if (is_invalid_sock(server_soc))
-    {
+    if(is_invalid_sock(server_soc)) {
         printf("Error creating socket");
         return;
     }
-    if (connect(server_soc, (const struct sockaddr *)&(neighbour->con), sizeof(neighbour->con)) != 0)
-    {
+    if(connect(server_soc, (const struct sockaddr *)&(neighbour->con), sizeof(neighbour->con)) != 0) {
         printf("Error connecting to peer\n");
         show_soc_error();
         return;
     }
     size_t len = strlen(msg);
-    if (send(server_soc, msg, len + 1, 0) == len + 1)
-    {
-        switch (msg_type)
-        {
+    if(send(server_soc, msg, len + 1, 0) == len + 1) {
+        switch(msg_type) {
         case HELLO:
             neighbour->status = ONLINE;
             break;
@@ -187,10 +163,8 @@ void send_message(char *msg, peer *neighbour, MSG_TYPE msg_type)
 
         show_soc_error();
     }
-    else
-    {
-        switch (msg_type)
-        {
+    else {
+        switch(msg_type) {
         case HELLO:
             neighbour->status = OFFLINE;
             break;
@@ -203,37 +177,31 @@ void send_message(char *msg, peer *neighbour, MSG_TYPE msg_type)
 }
 
 // read message, mark its sender and return the message type
-MSG_TYPE read_message(peer receiver, char *buf, int *clock, peer *sender)
-{ // TODO: add args when needed
+MSG_TYPE read_message(peer receiver, char *buf, int *clock, peer *sender) { // TODO: add args when needed
     char *tok_ip = strtok(buf, " ");
     int aclock = atoi(strtok(NULL, " "));
-    char *tok_msg = strtok(NULL, " "); //FIXME: QUANDO A MENSAGEM NÃO TEM ARGUMENTO, TOK_MSG FICA COM O TIPO DA MENSAGEM + \N, OQ RESULTA EM ERRO
+    char *tok_msg = strtok(NULL, " "); // FIXME: QUANDO A MENSAGEM NÃO TEM ARGUMENTO, TOK_MSG FICA COM O TIPO DA MENSAGEM + \N, OQ RESULTA EM ERRO
     create_address(sender, tok_ip);
-    if (strcmp(tok_msg, "HELLO") == 0)
+    if(strcmp(tok_msg, "HELLO") == 0)
         return HELLO;
-    if (strcmp(tok_msg, "BYE") == 0)
+    if(strcmp(tok_msg, "BYE") == 0)
         return BYE;
     return UNEXPECTED_MSG_TYPE;
 }
 
 // check if peer is in list of known peers
-int peer_in_list(peer a, peer *neighbours, size_t peers_size)
-{
-    for (int i = 0; i < peers_size; i++)
-    {
-        if (strcmp(inet_ntoa(a.con.sin_addr), inet_ntoa(neighbours[i].con.sin_addr)) == 0 && (a.con.sin_port == neighbours[i].con.sin_port))
+int peer_in_list(peer a, peer *neighbours, size_t peers_size) {
+    for(int i = 0; i < peers_size; i++) {
+        if(strcmp(inet_ntoa(a.con.sin_addr), inet_ntoa(neighbours[i].con.sin_addr)) == 0 && (a.con.sin_port == neighbours[i].con.sin_port))
             return i;
     }
     return -1;
 }
 
 // send a bye message to every peer in list
-void bye_peers(peer server, int *clock, peer *peers, size_t peers_size)
-{
-    for (int i = 0; i < peers_size; i++)
-    {
-        if (peers[i].status == ONLINE)
-        {
+void bye_peers(peer server, int *clock, peer *peers, size_t peers_size) {
+    for(int i = 0; i < peers_size; i++) {
+        if(peers[i].status == ONLINE) {
             char *msg = build_message(server.con, *clock, BYE, NULL);
             send_message(msg, &peers[i], BYE);
         }

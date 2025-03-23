@@ -6,14 +6,14 @@
 #include <stdbool.h>
 
 //read file with peers' ips and return them in text form
-char ** read_peers(FILE *f, size_t *len) {
-    char ** peers = NULL;
+char **read_peers(FILE *f, size_t *len) {
+    char **peers = NULL;
     *len = 0;
-    char ip[23] = {0}; //max ip size = 255.255.255.255:65535 -> 3+1+3+1+3+1+3+1+5 = 21 + possible newline + null terminator => 23
+    char ip[23] = { 0 }; //max ip size = 255.255.255.255:65535 -> 3+1+3+1+3+1+3+1+5 = 21 + possible newline + null terminator => 23
     while(true) {
         //read each line of file and put it in peers
         if(!fgets(ip, sizeof(ip), f)) break;
-        char **temp= realloc(peers, sizeof(char*) * (*len + 1));
+        char **temp = realloc(peers, sizeof(char *) * (*len + 1));
         if(!temp) {
             for(int i = 0; i < *len; i++) {
                 free(peers[i]);
@@ -31,7 +31,7 @@ char ** read_peers(FILE *f, size_t *len) {
         peers[*len] = malloc(sizeof(char) * ip_len);
         if(!peers[*len]) {
             // Handle memory allocation failure
-            for (int i = 0; i < *len; i++) {
+            for(int i = 0; i < *len; i++) {
                 free(peers[i]);
             }
             free(peers);
@@ -45,14 +45,14 @@ char ** read_peers(FILE *f, size_t *len) {
 }
 
 //store name of every file in directory
-char ** get_dir_files(DIR *dir, size_t *len) {
-    char ** files = NULL;
+char **get_dir_files(DIR *dir, size_t *len) {
+    char **files = NULL;
     *len = 0;
     while(true) {
-        dirent * dir_ent = readdir(dir);
+        dirent *dir_ent = readdir(dir);
         if(!dir_ent) break;
         if(dir_ent->d_name[0] == '.') continue;
-        char **temp = realloc(files, sizeof(char*) * (*len + 1));
+        char **temp = realloc(files, sizeof(char *) * (*len + 1));
         if(!temp) {
             for(int i = 0; i < *len; i++) {
                 free(files[i]);
