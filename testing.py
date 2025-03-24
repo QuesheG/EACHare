@@ -10,7 +10,7 @@ network = [
         [1, 1, 0, 0, 1, 0, 0, 0], #node 3
         [1, 0, 1, 1, 0, 0, 1, 1], #node 4
         [0, 0, 0, 1, 0, 0, 1, 0], #node 5
-        [0, 0, 0, 0, 1, 1, 0, 1], #node 6
+        [1, 0, 0, 0, 1, 1, 0, 1], #node 6
         [0, 0, 0, 0, 1, 0, 1, 0] #node 7
     ]
 f_peers = "peers.txt"
@@ -35,7 +35,7 @@ os.chdir("..")
 for i in range(8):
     if platform.system() == "Windows":
         shutil.copy(os.getcwd()+"/eachare.exe", os.getcwd()+"/testing/g0"+str(i))
-        os.system("start ./testing/g0"+str(i)+"/eachare.exe 127.0.0.1:500"+str(i)+" ./testing/g0"+str(i)+"/peers.txt ./testing/g0"+str(i)+"/files")
+        # os.system("start ./testing/g0"+str(i)+"/eachare.exe 127.0.0.1:500"+str(i)+" ./testing/g0"+str(i)+"/peers.txt ./testing/g0"+str(i)+"/files")
     if platform.system() == "Linux":
         shutil.copy(os.getcwd()+"/eachare", os.getcwd()+"/testing/g0"+str(i))
         # os.system("start ./testing/g0"+str(i)+"/eachare.exe 127.0.0.1:500"+str(i)+" ./testing/g0"+str(i)+"/peers.txt ./testing/g0"+str(i)+"/files")

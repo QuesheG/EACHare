@@ -12,6 +12,12 @@
         "direct.h": "c",
         "dir.h": "c",
         "io.h": "c",
-        "file.h": "c"
-    }
+        "file.h": "c",
+        "types.h": "c"
+    },
+    "C_Cpp.formatting": "vcFormat",
+    "C_Cpp.vcFormat.space.beforeBlockOpenBrace": true,
+    "C_Cpp.vcFormat.newLine.beforeOpenBrace.block": "sameLine",
+    "C_Cpp.vcFormat.space.pointerReferenceAlignment": "right",
+    "C_Cpp.vcFormat.space.afterKeywordsInControlFlowStatements": false
 }

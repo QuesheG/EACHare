@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <pthread.h>
 
 #ifdef WIN
 int init_win_sock(void) {
@@ -98,9 +99,10 @@ void append_peer(peer **peers, size_t *peers_size, peer new_peer) {
 }
 
 // print the peers in list
-void show_peers(peer server, int *clock, peer *peers, size_t peers_size) {
+void show_peers(peer server, int *clock, pthread_mutex_t *clock_lock, peer *peers, size_t peers_size) {
     printf("List peers:\n");
     printf("\t[0] Go back\n");
+
     for(int i = 0; i < peers_size; i++) {
         printf("\t[%d] %s:%u ", i + 1, inet_ntoa(peers[i].con.sin_addr), ntohs(peers[i].con.sin_port));
         if(peers[i].status == ONLINE)
@@ -108,14 +110,31 @@ void show_peers(peer server, int *clock, peer *peers, size_t peers_size) {
         else
             printf("OFFLINE\n");
     }
+
     int input;
-    scanf("%d", &input);
-    if(input == 0)
+    if(scanf("%d", &input) != 1) {
+        while(getchar() != '\n');
+        printf("Invalid input! Try again.\n");
+        return;
+    }
+    else if(input == 0)
         return;
     else if(input > 0 && input <= peers_size) {
+        pthread_mutex_lock(clock_lock);
+        (*clock)++;
+        pthread_mutex_unlock(clock_lock);
+        printf("=> Atualizando relogio para %d\n", *clock);
         char *msg = build_message(server.con, *clock, HELLO, NULL);
+        if(!msg) {
+            printf("Error: Failed to build message!\n");
+            return;
+        }
         send_message(msg, &(peers[input - 1]), HELLO);
         free(msg);
+    }
+    else {
+        printf("Invalid input! Try again.\n");
+        return;
     }
 }
 
@@ -123,6 +142,12 @@ void show_peers(peer server, int *clock, peer *peers, size_t peers_size) {
 char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *args) {
     char *ip = inet_ntoa(sender_ip.sin_addr);
     char *msg = malloc(sizeof(char) * MSG_SIZE);
+
+    if(!msg) {
+        perror("Failed to allocate memory");
+        return NULL;
+    }
+
     switch(msg_type) {
         /*
         MESSAGE FORMATING: <sender_ip>:<sender_port> <sender_clock> <MSG_TYPE> [<ARGS...>]\n <- important newline
@@ -134,7 +159,8 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
         sprintf(msg, "%s:%d %d BYE\n", ip, (int)ntohs(sender_ip.sin_port), clock);
         break;
     default:
-        break;
+        free(msg);
+        return NULL;
     }
     return msg;
 }
@@ -152,16 +178,16 @@ void send_message(char *msg, peer *neighbour, MSG_TYPE msg_type) {
         return;
     }
     size_t len = strlen(msg);
+    printf("Encaminhando mensagem \"%.*s\" para %s:%d\n", (int)strcspn(msg, "\n"), msg, inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port));
     if(send(server_soc, msg, len + 1, 0) == len + 1) {
         switch(msg_type) {
         case HELLO:
             neighbour->status = ONLINE;
+            printf("Atualizando peer %s:%d status ONLINE\n", inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port));
             break;
         default:
             break;
         }
-
-        show_soc_error();
     }
     else {
         switch(msg_type) {
@@ -180,7 +206,12 @@ void send_message(char *msg, peer *neighbour, MSG_TYPE msg_type) {
 MSG_TYPE read_message(peer receiver, char *buf, int *clock, peer *sender) { // TODO: add args when needed
     char *tok_ip = strtok(buf, " ");
     int aclock = atoi(strtok(NULL, " "));
-    char *tok_msg = strtok(NULL, " "); // FIXME: QUANDO A MENSAGEM NÃO TEM ARGUMENTO, TOK_MSG FICA COM O TIPO DA MENSAGEM + \N, OQ RESULTA EM ERRO
+    char *tok_msg = strtok(NULL, " ");
+
+    if(tok_msg) {
+        tok_msg[strcspn(tok_msg, "\n")] = '\0';
+    }
+
     create_address(sender, tok_ip);
     if(strcmp(tok_msg, "HELLO") == 0)
         return HELLO;
