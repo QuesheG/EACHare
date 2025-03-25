@@ -43,8 +43,9 @@ void show_soc_error() {
 }
 
 // create an IPv4 sockaddr_in
-void create_address(peer *address, char *ip) {
-    char *tokip = strtok(ip, ":");
+void create_address(peer *address, const char *ip) {
+    char *ip_cpy = strdup(ip);
+    char *tokip = strtok(ip_cpy, ":");
     char *tokport = strtok(NULL, ":");
     address->con.sin_addr.s_addr = inet_addr(tokip);
     address->con.sin_family = AF_INET;
@@ -123,7 +124,7 @@ void show_peers(peer server, int *clock, pthread_mutex_t *clock_lock, peer *peer
         pthread_mutex_lock(clock_lock);
         (*clock)++;
         pthread_mutex_unlock(clock_lock);
-        printf("=> Atualizando relogio para %d\n", *clock);
+        printf("\t=> Atualizando relogio para %d\n", *clock);
         char *msg = build_message(server.con, *clock, HELLO, NULL);
         if(!msg) {
             printf("Error: Failed to build message!\n");
@@ -136,6 +137,36 @@ void show_peers(peer server, int *clock, pthread_mutex_t *clock_lock, peer *peer
         printf("Invalid input! Try again.\n");
         return;
     }
+}
+
+// request the peers list of every known peer
+void get_peers(peer server, int *clock, pthread_mutex_t *clock_lock, peer *peers, size_t peers_size) {
+    char *msg = build_message(server.con, *clock, GET_PEERS, NULL);
+    if(!msg) {
+        printf("Error: Failed to build message!\n");
+        return;
+    }
+    for(int i = 0; i < peers_size; i++) {
+        pthread_mutex_lock(clock_lock);
+        (*clock)++;
+        pthread_mutex_unlock(clock_lock);
+        printf("\t=> Atualizando relogio para %d\n", *clock);
+        send_message(msg, &peers[i], GET_PEERS);
+    }
+}
+
+// share the peers list with who requested
+void share_peers_list(peer server, int clock, SOCKET soc_sender, peer *sender, peer *peers, size_t peers_size) {
+    peer_list_args args;
+    args.sender = *sender;
+    args.peers = peers;
+    args.peers_size = peers_size;
+    char *msg = build_message(server.con, clock, PEER_LIST, (void *)&args);
+    size_t len = strlen(msg);
+    printf("Encaminhando mensagem \"%.*s\" para %s:%d\n", (int)strcspn(msg, "\n"), msg, inet_ntoa(sender->con.sin_addr), ntohs(sender->con.sin_port));
+    if(send(soc_sender, msg, len + 1, 0) == len + 1) // reaproveita soc para responder sem ter q abrir um novo
+        ;
+    else printf("Error answering peer\n");
 }
 
 // create a message with the sender ip, its clock and the message type
@@ -155,6 +186,31 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
     case HELLO:
         sprintf(msg, "%s:%d %d HELLO\n", ip, (int)ntohs(sender_ip.sin_port), clock);
         break;
+    case GET_PEERS:
+        sprintf(msg, "%s:%d %d GET_PEERS\n", ip, (int)ntohs(sender_ip.sin_port), clock);
+        break;
+    case PEER_LIST:
+        peer_list_args *args = (peer_list_args *)args;
+        peer sender = args->sender;
+        size_t peers_size = args->peers_size;
+        peer *peers = args->peers;
+        char *temp = realloc(msg, sizeof(char *) * alt_msg_size(peers_size));
+        if(!temp) {
+            printf("Failed to build message\n");
+            return NULL;
+        }
+        msg = temp;
+        int argumento_sem_nome_ainda = 0;
+        sprintf(msg, "%s:%d %d PEER_LIST %d", ip, (int)ntohs(sender_ip.sin_port), clock, peers_size);
+        for(int i = 0; i < peers_size; i++) {
+            if(strcmp(inet_ntoa(sender.con.sin_addr), inet_ntoa(peers[i].con.sin_addr)) == 0 && (sender.con.sin_port == peers[i].con.sin_port))
+                continue;
+            sprintf(msg, " %s", msg);
+            if(peers[i].status == ONLINE) sprintf(msg, "%s%s:%d:ONLINE:%d", msg, inet_ntoa(peers[i].con.sin_addr), peers[i].con.sin_port, argumento_sem_nome_ainda);
+            else sprintf(msg, "%s%s:%d:OFFLINE:%d", msg, inet_ntoa(peers[i].con.sin_addr), peers[i].con.sin_port, argumento_sem_nome_ainda);
+        }
+        sprintf(msg, "%s\n", msg);
+        break;
     case BYE:
         sprintf(msg, "%s:%d %d BYE\n", ip, (int)ntohs(sender_ip.sin_port), clock);
         break;
@@ -165,8 +221,12 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
     return msg;
 }
 
-// send a built message to an ONLINE known peer socket
+// send a built message to an known peer socket
 void send_message(char *msg, peer *neighbour, MSG_TYPE msg_type) {
+    if(!msg) {
+        printf("Failed to pass message\n");
+        return;
+    }
     SOCKET server_soc = socket(AF_INET, SOCK_STREAM, 0);
     if(is_invalid_sock(server_soc)) {
         printf("Error creating socket");
@@ -185,6 +245,10 @@ void send_message(char *msg, peer *neighbour, MSG_TYPE msg_type) {
             neighbour->status = ONLINE;
             printf("Atualizando peer %s:%d status ONLINE\n", inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port));
             break;
+        case GET_PEERS:
+            neighbour->status = ONLINE;
+            printf("Atualizando peer %s:%d status ONLINE\n", inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port));
+            break;
         default:
             break;
         }
@@ -192,6 +256,9 @@ void send_message(char *msg, peer *neighbour, MSG_TYPE msg_type) {
     else {
         switch(msg_type) {
         case HELLO:
+            neighbour->status = OFFLINE;
+            break;
+        case GET_PEERS:
             neighbour->status = OFFLINE;
             break;
         default:
@@ -203,7 +270,8 @@ void send_message(char *msg, peer *neighbour, MSG_TYPE msg_type) {
 }
 
 // read message, mark its sender and return the message type
-MSG_TYPE read_message(peer receiver, char *buf, int *clock, peer *sender) { // TODO: add args when needed
+MSG_TYPE read_message(peer receiver, const char *buf, int *clock, peer *sender) {
+    char *buf_cpy = strdup(buf);
     char *tok_ip = strtok(buf, " ");
     int aclock = atoi(strtok(NULL, " "));
     char *tok_msg = strtok(NULL, " ");
@@ -227,6 +295,51 @@ int peer_in_list(peer a, peer *neighbours, size_t peers_size) {
             return i;
     }
     return -1;
+}
+
+// check if message received was read fully
+char *check_msg_full(const char *buf, SOCKET sock, int *rec_peers_size, int *valread){
+    bool is_full_msg = false;
+    char *buf = 0;
+    if(*valread == 50) {
+        for(int i = 0; i < *valread; i++) {
+            if(buf[i] == '\n') {
+                is_full_msg = true;
+                break;
+            }
+        }
+        if(!is_full_msg) {
+            size_t find_size = 0;
+            int spaces = 0;
+            char *duplicate;
+            for(int i = 0; i < *valread; i++) {
+                if(buf[i] == ' ') spaces++;
+                if(spaces == 3) {
+                    char *duplicate = strdup(&buf[i]);
+                }
+                if(spaces == 4) {
+                    duplicate[i] = '\0';
+                    rec_peers_size = atoi(duplicate);
+                    int new_size = alt_msg_size(*rec_peers_size);
+                    buf = malloc(sizeof(char) * new_size);
+                    sprintf(buf, "%s", buf);
+                    *valread += recv(sock, &buf[*valread], new_size, 0);
+                }
+            }
+        }
+    }
+    if(!buf) return NULL;
+    return buf;
+}
+
+// append received list to known peer list
+void append_list_peers(char *buf, peer **peers, size_t *peers_size, peer *rec_peers, size_t rec_peers_size) {
+    strtok(buf, " "); //ip
+    strtok(NULL, " ");//clock
+    strtok(NULL, " ");//type
+    strtok(NULL, " ");//size
+    //TODO: loop string getting info
+    //loop through info getting ip, port, status, number
 }
 
 // send a bye message to every peer in list

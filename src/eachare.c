@@ -32,12 +32,13 @@ typedef struct listen_args
 // routine for socket to listen to messages
 void *listen_socket(void *args)
 {
-    peer server = ((listen_args *)args)->server;
-    peer **peers = ((listen_args *)args)->neighbours;
-    size_t *peers_size = ((listen_args *)args)->peers_size;
-    int *clock = ((listen_args *)args)->clock;
-    char *file = ((listen_args *)args)->file;
-    // DIR *dir = ((listen_args *)args)->dir;
+    listen_args *list_args = (listen_args *)args;
+    peer server = list_args->server;
+    peer **peers = list_args->neighbours;
+    size_t *peers_size = list_args->peers_size;
+    int *clock = list_args->clock;
+    char *file = list_args->file;
+    // DIR *dir = list_args->dir;
 
     int opt = 1;
     SOCKET server_soc;
@@ -67,6 +68,12 @@ void *listen_socket(void *args)
             continue;
         }
 
+        int rec_peers_size = 0;
+        char *temp = check_msg_full(buf, n_sock, &rec_peers_size, &valread);
+        if(temp) {
+            char *buf = temp;
+        }
+
         buf[valread] = '\0';
         printf("Mensagem recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
         pthread_mutex_lock(&clock_lock);
@@ -86,8 +93,21 @@ void *listen_socket(void *args)
         }
         switch(msg_type) {
         case HELLO:
-            (*peers)[i].status = ONLINE;
-            printf("Atualizando peer %s:%d para status ONLINE\n", inet_ntoa((*peers)[i].con.sin_addr), ntohs((*peers)[i].con.sin_port));
+            if((*peers)[i].status != OFFLINE) {
+                (*peers)[i].status = ONLINE;
+                printf("Atualizando peer %s:%d para status ONLINE\n", inet_ntoa((*peers)[i].con.sin_addr), ntohs((*peers)[i].con.sin_port));
+            }
+            break;
+        case GET_PEERS:
+            if((*peers)[i].status != OFFLINE) {
+                (*peers)[i].status = ONLINE;
+                printf("Atualizando peer %s:%d para status ONLINE\n", inet_ntoa((*peers)[i].con.sin_addr), ntohs((*peers)[i].con.sin_port));
+            }
+            share_peers_list(server, *clock, n_sock, &(*peers)[i], *peers, *peers_size);
+            break;
+        case PEER_LIST:
+            append_list_peers();
+            //TODO:
             break;
         case BYE:
             (*peers)[i].status = OFFLINE;
@@ -180,6 +200,7 @@ int main(int argc, char **argv)
             show_peers(server, &loc_clock, &clock_lock, *peers, *peers_size);
             break;
         case 2:
+            get_peers(server, &loc_clock, &clock_lock, *peers, *peers_size);
             break;
         case 3:
             show_files(files, files_len);
