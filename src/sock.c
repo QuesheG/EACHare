@@ -333,13 +333,36 @@ char *check_msg_full(const char *buf, SOCKET sock, int *rec_peers_size, int *val
 }
 
 // append received list to known peer list
-void append_list_peers(char *buf, peer **peers, size_t *peers_size, peer *rec_peers, size_t rec_peers_size) {
+void append_list_peers(char *buf, peer **peers, size_t *peers_size, size_t rec_peers_size) { // FIXME: fix func signature, decouple later
     strtok(buf, " "); //ip
     strtok(NULL, " ");//clock
     strtok(NULL, " ");//type
     strtok(NULL, " ");//size
-    //TODO: loop string getting info
-    //loop through info getting ip, port, status, number
+    char *list = strtok(NULL, " \n");
+    char *cpy = strdup(list);
+    char *p = strtok(cpy, " ");
+    int times = 0;
+    peer * rec_peers_list = malloc(sizeof(peer) * rec_peers_size);
+    for(int i = 0; i < rec_peers_size; i++) {
+        char *infon = strtok(p, ":");
+        for(int j = 0; j < 4; j++) { //hardcoding infos size :D => ip1:port2:status3:num4
+            if(j == 0) rec_peers_list[i].con.sin_addr.s_addr = inet_addr(infon);
+            if(j == 1) rec_peers_list[i].con.sin_port = htons((unsigned short)atoi(infon));
+            if(j == 2) {
+                if(strcmp(infon, "ONLINE") == 0) rec_peers_list[i].status = ONLINE;
+                else rec_peers_list[i].status = OFFLINE;
+            }
+            if(j == 3) ; // FIXME: numero aleatorio jogado fora por enquanto;
+            infon = strtok(NULL, ":");
+        }
+        times += 1;
+        cpy = strdup(list);
+        for(int j = 0; j <= times; j++) {
+            if(j == 0) p = strtok(cpy, " ");
+            else p = strtok(NULL, " ");
+        }
+    }
+    //TODO: FIXME: APPEND UNKNOWN REC_PEERS_LIST TO PEERS;
 }
 
 // send a bye message to every peer in list

@@ -106,8 +106,7 @@ void *listen_socket(void *args)
             share_peers_list(server, *clock, n_sock, &(*peers)[i], *peers, *peers_size);
             break;
         case PEER_LIST:
-            append_list_peers();
-            //TODO:
+            append_list_peers(buf, peers, peers_size, rec_peers_size);
             break;
         case BYE:
             (*peers)[i].status = OFFLINE;
