@@ -7,15 +7,6 @@
 #include <stdbool.h>
 #include <pthread.h>
 
-/*
-    TODO:
-        Att do clock a cada mensagem
-        Comm 2 Get Peers
-        Mutex/Semaforo em clocks e peers_size e should_quit
-    FIXME:
-        Status when receiving message
-*/
-
 bool should_quit = false;
 pthread_mutex_t clock_lock;
 

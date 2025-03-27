@@ -25,15 +25,3 @@ For now, all you have to do is, in your terminal, set up the peer with your ip a
 ./eachare <ip>:<port> <peers.txt> <share_folder>
 ```
 the project has examples for both peers.txt and a share_folder
-
-## TODO
-
-make string functions use const
-
-implement clock
-
-implement comm 2
-
-fix bye/get status on hllo
-
-Mutex/semaforo em clocks e peers_size e should_quit

@@ -42,6 +42,11 @@ void show_soc_error() {
 #endif
 }
 
+// compare two peers
+bool is_same_peer(peer a, peer b) {
+    return (strcmp(inet_ntoa(a.con.sin_addr), inet_ntoa(b.con.sin_addr)) == 0 && (a.con.sin_port == b.con.sin_port));
+}
+
 // create an IPv4 sockaddr_in
 void create_address(peer *address, const char *ip) {
     char *ip_cpy = strdup(ip);
@@ -74,7 +79,7 @@ bool create_server(SOCKET *server, sockaddr_in address, int opt) {
 }
 
 // create peers
-peer *create_peers(char **peers_ip, size_t peers_size) {
+peer *create_peers(const char **peers_ip, size_t peers_size) {
     peer *peers = malloc(sizeof(peer) * peers_size);
     if(!peers) {
         perror("Failed to allocate memory");
@@ -203,7 +208,7 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
         int argumento_sem_nome_ainda = 0;
         sprintf(msg, "%s:%d %d PEER_LIST %d", ip, (int)ntohs(sender_ip.sin_port), clock, peers_size);
         for(int i = 0; i < peers_size; i++) {
-            if(strcmp(inet_ntoa(sender.con.sin_addr), inet_ntoa(peers[i].con.sin_addr)) == 0 && (sender.con.sin_port == peers[i].con.sin_port))
+            if(is_same_peer(sender, peers[i]))
                 continue;
             sprintf(msg, " %s", msg);
             if(peers[i].status == ONLINE) sprintf(msg, "%s%s:%d:ONLINE:%d", msg, inet_ntoa(peers[i].con.sin_addr), peers[i].con.sin_port, argumento_sem_nome_ainda);
@@ -222,7 +227,7 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
 }
 
 // send a built message to an known peer socket
-void send_message(char *msg, peer *neighbour, MSG_TYPE msg_type) {
+void send_message(const char *msg, peer *neighbour, MSG_TYPE msg_type) {
     if(!msg) {
         printf("Failed to pass message\n");
         return;
@@ -291,14 +296,14 @@ MSG_TYPE read_message(peer receiver, const char *buf, int *clock, peer *sender) 
 // check if peer is in list of known peers
 int peer_in_list(peer a, peer *neighbours, size_t peers_size) {
     for(int i = 0; i < peers_size; i++) {
-        if(strcmp(inet_ntoa(a.con.sin_addr), inet_ntoa(neighbours[i].con.sin_addr)) == 0 && (a.con.sin_port == neighbours[i].con.sin_port))
+        if(is_same_peer(a, neighbours[i]))
             return i;
     }
     return -1;
 }
 
 // check if message received was read fully
-char *check_msg_full(const char *buf, SOCKET sock, int *rec_peers_size, int *valread){
+char *check_msg_full(const char *buf, SOCKET sock, int *rec_peers_size, int *valread) {
     bool is_full_msg = false;
     char *buf = 0;
     if(*valread == 50) {
@@ -333,8 +338,9 @@ char *check_msg_full(const char *buf, SOCKET sock, int *rec_peers_size, int *val
 }
 
 // append received list to known peer list
-void append_list_peers(char *buf, peer **peers, size_t *peers_size, size_t rec_peers_size) { // FIXME: fix func signature, decouple later
-    strtok(buf, " "); //ip
+void append_list_peers(const char *buf, peer **peers, size_t *peers_size, size_t rec_peers_size) {
+    char *cpy = strdup(buf);
+    strtok(cpy, " "); //ip
     strtok(NULL, " ");//clock
     strtok(NULL, " ");//type
     strtok(NULL, " ");//size
@@ -342,7 +348,7 @@ void append_list_peers(char *buf, peer **peers, size_t *peers_size, size_t rec_p
     char *cpy = strdup(list);
     char *p = strtok(cpy, " ");
     int times = 0;
-    peer * rec_peers_list = malloc(sizeof(peer) * rec_peers_size);
+    peer *rec_peers_list = malloc(sizeof(peer) * rec_peers_size);
     for(int i = 0; i < rec_peers_size; i++) {
         char *infon = strtok(p, ":");
         for(int j = 0; j < 4; j++) { //hardcoding infos size :D => ip1:port2:status3:num4
@@ -352,7 +358,7 @@ void append_list_peers(char *buf, peer **peers, size_t *peers_size, size_t rec_p
                 if(strcmp(infon, "ONLINE") == 0) rec_peers_list[i].status = ONLINE;
                 else rec_peers_list[i].status = OFFLINE;
             }
-            if(j == 3) ; // FIXME: numero aleatorio jogado fora por enquanto;
+            if(j == 3); // FIXME: numero aleatorio jogado fora por enquanto;
             infon = strtok(NULL, ":");
         }
         times += 1;
@@ -363,6 +369,18 @@ void append_list_peers(char *buf, peer **peers, size_t *peers_size, size_t rec_p
         }
     }
     //TODO: FIXME: APPEND UNKNOWN REC_PEERS_LIST TO PEERS;
+    for(int i = 0; i < rec_peers_size; i++) {
+        bool add = true;
+        for(int j = 0; j < *peers_size; j++)
+            if(is_same_peer(rec_peers_list[i], (*peers)[j])) add = false; break;
+        if(add) {
+            peer *temp = realloc(*peers, sizeof(peer) * (*peers_size + 1));
+            if(!temp) free(rec_peers_list);
+            *peers = temp;
+            (*peers)[*peers_size] = rec_peers_list[i];
+            *peers_size += 1;
+        }
+    }
 }
 
 // send a bye message to every peer in list
