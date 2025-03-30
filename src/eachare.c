@@ -50,7 +50,7 @@ void *listen_socket(void *args)
             printf("Error creating new socket\n");
         }
 
-        char buf[MSG_SIZE] = { 0 };
+        char *buf = malloc(sizeof(char) * MSG_SIZE);
 
         ssize_t valread = recv(n_sock, buf, MSG_SIZE - 1, 0);
 
@@ -62,7 +62,7 @@ void *listen_socket(void *args)
         int rec_peers_size = 0;
         char *temp = check_msg_full(buf, n_sock, &rec_peers_size, &valread);
         if(temp) {
-            char *buf = temp;
+            buf = temp;
         }
 
         buf[valread] = '\0';

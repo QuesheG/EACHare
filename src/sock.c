@@ -195,10 +195,11 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
         sprintf(msg, "%s:%d %d GET_PEERS\n", ip, (int)ntohs(sender_ip.sin_port), clock);
         break;
     case PEER_LIST:
-        peer_list_args *args = (peer_list_args *)args;
-        peer sender = args->sender;
-        size_t peers_size = args->peers_size;
-        peer *peers = args->peers;
+        ;
+        peer_list_args *list_args = (peer_list_args *)args;
+        peer sender = list_args->sender;
+        size_t peers_size = list_args->peers_size;
+        peer *peers = list_args->peers;
         char *temp = realloc(msg, sizeof(char *) * alt_msg_size(peers_size));
         if(!temp) {
             printf("Failed to build message\n");
@@ -277,7 +278,7 @@ void send_message(const char *msg, peer *neighbour, MSG_TYPE msg_type) {
 // read message, mark its sender and return the message type
 MSG_TYPE read_message(peer receiver, const char *buf, int *clock, peer *sender) {
     char *buf_cpy = strdup(buf);
-    char *tok_ip = strtok(buf, " ");
+    char *tok_ip = strtok(buf_cpy, " ");
     int aclock = atoi(strtok(NULL, " "));
     char *tok_msg = strtok(NULL, " ");
 
@@ -305,7 +306,6 @@ int peer_in_list(peer a, peer *neighbours, size_t peers_size) {
 // check if message received was read fully
 char *check_msg_full(const char *buf, SOCKET sock, int *rec_peers_size, int *valread) {
     bool is_full_msg = false;
-    char *buf = 0;
     if(*valread == 50) {
         for(int i = 0; i < *valread; i++) {
             if(buf[i] == '\n') {
@@ -314,27 +314,28 @@ char *check_msg_full(const char *buf, SOCKET sock, int *rec_peers_size, int *val
             }
         }
         if(!is_full_msg) {
-            size_t find_size = 0;
             int spaces = 0;
             char *duplicate;
             for(int i = 0; i < *valread; i++) {
                 if(buf[i] == ' ') spaces++;
                 if(spaces == 3) {
-                    char *duplicate = strdup(&buf[i]);
+                    duplicate = strdup(&buf[i]);
                 }
                 if(spaces == 4) {
                     duplicate[i] = '\0';
-                    rec_peers_size = atoi(duplicate);
+                    *rec_peers_size = atoi(duplicate);
                     int new_size = alt_msg_size(*rec_peers_size);
-                    buf = malloc(sizeof(char) * new_size);
-                    sprintf(buf, "%s", buf);
-                    *valread += recv(sock, &buf[*valread], new_size, 0);
+                    char *aux_buf;
+                    aux_buf = malloc(sizeof(char) * new_size);
+                    if(!aux_buf) return NULL;
+                    sprintf(aux_buf, "%s", buf);
+                    *valread += recv(sock, &aux_buf[*valread], new_size, 0);
+                    return aux_buf;
                 }
             }
         }
     }
-    if(!buf) return NULL;
-    return buf;
+    return NULL;
 }
 
 // append received list to known peer list
@@ -345,7 +346,7 @@ void append_list_peers(const char *buf, peer **peers, size_t *peers_size, size_t
     strtok(NULL, " ");//type
     strtok(NULL, " ");//size
     char *list = strtok(NULL, " \n");
-    char *cpy = strdup(list);
+    cpy = strdup(list);
     char *p = strtok(cpy, " ");
     int times = 0;
     peer *rec_peers_list = malloc(sizeof(peer) * rec_peers_size);
@@ -371,8 +372,12 @@ void append_list_peers(const char *buf, peer **peers, size_t *peers_size, size_t
     //TODO: FIXME: APPEND UNKNOWN REC_PEERS_LIST TO PEERS;
     for(int i = 0; i < rec_peers_size; i++) {
         bool add = true;
-        for(int j = 0; j < *peers_size; j++)
-            if(is_same_peer(rec_peers_list[i], (*peers)[j])) add = false; break;
+        for(int j = 0; j < *peers_size; j++) {
+            if(is_same_peer(rec_peers_list[i], (*peers)[j])) {
+                add = false;
+                break;
+            }
+        }
         if(add) {
             peer *temp = realloc(*peers, sizeof(peer) * (*peers_size + 1));
             if(!temp) free(rec_peers_list);
