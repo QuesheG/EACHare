@@ -207,7 +207,7 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
         }
         msg = temp;
         int argumento_sem_nome_ainda = 0;
-        sprintf(msg, "%s:%d %d PEER_LIST %d", ip, (int)ntohs(sender_ip.sin_port), clock, peers_size - 1);
+        sprintf(msg, "%s:%d %d PEER_LIST %d", ip, (int)ntohs(sender.con.sin_port), clock, peers_size - 1); // TODO: analyse why do it return wrong with sender_ip
         for(int i = 0; i < peers_size; i++) {
             if(is_same_peer(sender, peers[i]))
                 continue;

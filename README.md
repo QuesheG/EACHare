@@ -29,3 +29,4 @@ the project has examples for both peers.txt and a share_folder
 ## TODO:
 
 Resposta recebida depois de get_peers seguindo relatório
+Analyse why do it return wrong with sender_ip (sock.c: line 210)
