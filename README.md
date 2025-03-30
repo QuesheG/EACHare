@@ -25,3 +25,7 @@ For now, all you have to do is, in your terminal, set up the peer with your ip a
 ./eachare <ip>:<port> <peers.txt> <share_folder>
 ```
 the project has examples for both peers.txt and a share_folder
+
+## TODO:
+
+Resposta recebida depois de get_peers seguindo relatório

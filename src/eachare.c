@@ -180,6 +180,7 @@ int main(int argc, char **argv)
             "\t[5] Exhibit statistics -> WIP\n"
             "\t[6] Change chuck size -> WIP\n"
             "\t[9] Exit\n");
+        printf(">");
         if(scanf("%d", &comm) != 1) {
             while(getchar() != '\n');
             printf("Unexpected command\n");
