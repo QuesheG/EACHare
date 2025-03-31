@@ -8,17 +8,16 @@ EACHare is a file transfer project for USP's Distributed Systems course, it will
 
 ## Instalation
 
+```console
+git clone https://github.com/QuesheG/EACHare
+```
+
+## Usage
+
 run
 ```console
 make
 ```
-
-You can also use python to make a testing ground with multiple folders, each with its own known peers and a folder to hold files:
-```console
-python testing.py
-```
-
-## Usage
 
 For now, all you have to do is, in your terminal, set up the peer with your ip and a port, choose a text file with your peers (one <ip>:<port> per line) and a directory to share (in the same folder as the peers file)
 ```console
@@ -26,9 +25,17 @@ For now, all you have to do is, in your terminal, set up the peer with your ip a
 ```
 the project has examples for both peers.txt and a share_folder
 
+You can also use python to make a testing ground with multiple folders, each with its own known peers and a folder to hold files:
+```console
+python testing.py
+```
+
 ## TODO:
 
 Resposta recebida depois de get_peers seguindo relatório
+
 Analyse why do it return wrong with sender_ip (sock.c: line 210)
+
 Problema build_msg
+
 Problema recebimento

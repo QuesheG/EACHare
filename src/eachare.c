@@ -120,6 +120,10 @@ void *listen_socket(void *args)
     return NULL;
 }
 
+void treat_request(void *args) {
+    
+}
+
 int main(int argc, char **argv)
 {
     if(argc != 4) {
