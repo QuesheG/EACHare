@@ -30,3 +30,6 @@ $(OBJ_DIR):
 
 clean:
 	$(REMOVE) $(OBJ_DIR)
+
+clean_testing:
+	$(REMOVE) testing

@@ -37,18 +37,19 @@ void *listen_socket(void *args)
         printf("Error creating server\n");
         return NULL;
     }
+    if(listen(server_soc, 3) != 0) {
+        printf("Error listening in socket\n");
+        return NULL;
+    }
     while(!should_quit) {
-        if(listen(server_soc, 3) != 0) {
-            printf("Error listening in socket\n");
-            continue;
-        }
-
         socklen_t addrlen = sizeof(server.con);
 
         SOCKET n_sock = accept(server_soc, (struct sockaddr *)&server.con, &addrlen);
         if(is_invalid_sock(n_sock) && !should_quit) {
             printf("Error creating new socket\n");
         }
+
+        // TODO: criar threads
 
         char *buf = malloc(sizeof(char) * MSG_SIZE);
 
@@ -147,7 +148,7 @@ int main(int argc, char **argv)
         return 1;
     }
     peers_txt = read_peers(f, peers_size);
-    *peers = create_peers(peers_txt, *peers_size);
+    *peers = create_peers((const char **)peers_txt, *peers_size);
     fclose(f);
     for(int i = 0; i < *peers_size; i++) {
         free(peers_txt[i]);
@@ -174,11 +175,11 @@ int main(int argc, char **argv)
     while(!should_quit) {
         printf("Choose a command:\n"
             "\t[1] List peers\n"
-            "\t[2] Get peers -> WIP\n"
+            "\t[2] Get peers\n"
             "\t[3] List local files\n"
             "\t[4] Get files -> WIP\n"
             "\t[5] Exhibit statistics -> WIP\n"
-            "\t[6] Change chuck size -> WIP\n"
+            "\t[6] Change chunk size -> WIP\n"
             "\t[9] Exit\n");
         printf(">");
         if(scanf("%d", &comm) != 1) {
@@ -196,8 +197,14 @@ int main(int argc, char **argv)
         case 3:
             show_files(files, files_len);
             break;
+        case 4:
+            //get_files();
+            break;
         case 5:
             // show_statistics();
+            break;
+        case 6:
+            // change_chunk_size();
             break;
         case 9:
             printf("Exiting...\n");

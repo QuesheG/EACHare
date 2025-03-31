@@ -207,7 +207,7 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
         }
         msg = temp;
         int argumento_sem_nome_ainda = 0;
-        sprintf(msg, "%s:%d %d PEER_LIST %d", ip, (int)ntohs(sender.con.sin_port), clock, peers_size - 1); // TODO: analyse why do it return wrong with sender_ip
+        sprintf(msg, "%s:%d %d PEER_LIST %d", ip, (int)ntohs(sender_ip.sin_port), clock, peers_size - 1); // TODO: analyse why do it return wrong with sender_ip
         for(int i = 0; i < peers_size; i++) {
             if(is_same_peer(sender, peers[i]))
                 continue;
@@ -291,6 +291,7 @@ MSG_TYPE read_message(peer receiver, const char *buf, int *clock, peer *sender) 
     char *tok_ip = strtok(buf_cpy, " ");
     int aclock = atoi(strtok(NULL, " "));
     char *tok_msg = strtok(NULL, " ");
+    aclock = aclock; // FIXME: melhor jeito de tirar mensagem de variável inútil
 
     if(tok_msg) {
         tok_msg[strcspn(tok_msg, "\n")] = '\0';
