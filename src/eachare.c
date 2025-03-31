@@ -1,11 +1,14 @@
 #include <stdio.h>
-#include <sock.h>
 #include <file.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <dirent.h>
 #include <stdbool.h>
 #include <pthread.h>
+
+#include <sock.h>
+#include <peer.h>
+#include <message.h>
 
 bool should_quit = false;
 pthread_mutex_t clock_lock;
@@ -34,11 +37,13 @@ void *listen_socket(void *args)
     int opt = 1;
     SOCKET server_soc;
     if(!create_server(&server_soc, server.con, opt)) {
-        printf("Error creating server\n");
+        fprintf(stderr, "Error creating server\n");
+        show_soc_error();
         return NULL;
     }
     if(listen(server_soc, 3) != 0) {
-        printf("Error listening in socket\n");
+        fprintf(stderr, "Error listening in socket\n");
+        show_soc_error();
         return NULL;
     }
     while(!should_quit) {
@@ -46,8 +51,9 @@ void *listen_socket(void *args)
 
         SOCKET n_sock = accept(server_soc, (struct sockaddr *)&server.con, &addrlen);
         if(is_invalid_sock(n_sock) && !should_quit) {
-            printf("Error creating new socket\n");
+            fprintf(stderr, "Error creating new socket\n");
         }
+        if(should_quit) return NULL;
 
         // TODO: criar threads
 
@@ -56,7 +62,7 @@ void *listen_socket(void *args)
         ssize_t valread = recv(n_sock, buf, MSG_SIZE - 1, 0);
 
         if(valread <= 0 && !should_quit) {
-            printf("Error reading from neighbour\n");
+            fprintf(stderr, "Error reading from neighbour\n");
             continue;
         }
 
@@ -71,7 +77,7 @@ void *listen_socket(void *args)
         pthread_mutex_lock(&clock_lock);
         (*clock)++;
         pthread_mutex_unlock(&clock_lock);
-        printf("=> Atualizando relogio para %d\n", *clock);
+        printf("\t=> Atualizando relogio para %d\n", *clock);
 
         peer sender;
         MSG_TYPE msg_type = read_message(server, buf, clock, &sender);
@@ -95,7 +101,7 @@ void *listen_socket(void *args)
                 (*peers)[i].status = ONLINE;
                 printf("Atualizando peer %s:%d para status ONLINE\n", inet_ntoa((*peers)[i].con.sin_addr), ntohs((*peers)[i].con.sin_port));
             }
-            share_peers_list(server, *clock, n_sock, &(*peers)[i], *peers, *peers_size);
+            share_peers_list(server, clock, &clock_lock, &(*peers)[i], *peers, *peers_size);
             break;
         case PEER_LIST:
             append_list_peers(buf, peers, peers_size, rec_peers_size);
@@ -104,7 +110,7 @@ void *listen_socket(void *args)
             (*peers)[i].status = OFFLINE;
             printf("Atualizando peer %s:%d para status OFFLINE\n", inet_ntoa((*peers)[i].con.sin_addr), ntohs((*peers)[i].con.sin_port));
         default:
-            printf("Couldn't resolve message type\n");
+            printf("Tipo de mensagem nao reconhecido\n");
             break;
         }
         sock_close(n_sock);
@@ -117,12 +123,13 @@ void *listen_socket(void *args)
 int main(int argc, char **argv)
 {
     if(argc != 4) {
-        printf("Wrong arguments!\nExpected: %s <ip>:<port> <neighbours.txt> <shareable_dir>", argv[0]);
+        fprintf(stderr, "Argumentos errados!\nEsperado: %s <endereco>:<porta> <vizinhos.txt> <diretorio_compartilhado>", argv[0]);
         return 1;
     }
 #ifdef WIN
     if(init_win_sock()) {
-        printf("Error creating Windows socket\n");
+        fprintf(stderr, "Erro criando socket Windows\n");
+        show_soc_error();
         return 1;
     }
 #endif
@@ -139,12 +146,18 @@ int main(int argc, char **argv)
     char **peers_txt, **files;
     pthread_t listener_thread;
 
+    if(!peers || !peers_size) {
+        fprintf(stderr, "Erro: falha na alocação de memoria\n");
+        return 1;
+    }
+
     create_address(&server, argv[1]);
 
     // read file to get neighbours
     FILE *f = fopen(argv[2], "r");
     if(!f) {
-        printf("Error opening file %s\n", argv[2]);
+        fprintf(stderr, "Erro abrindo arquivo %s\n", argv[2]);
+        perror(NULL);
         return 1;
     }
     peers_txt = read_peers(f, peers_size);
@@ -158,7 +171,7 @@ int main(int argc, char **argv)
     // read directory
     DIR *shared_dir = opendir(argv[3]);
     if(!shared_dir) {
-        printf("Directory not found, try check spelling or existance of said directory\n");
+        perror("Diretorio nao achado, cheque escrita ou existencia do diretorio");
         return 1;
     }
     files = get_dir_files(shared_dir, &files_len);
@@ -173,18 +186,18 @@ int main(int argc, char **argv)
     pthread_create(&listener_thread, NULL, listen_socket, (void *)args);
 
     while(!should_quit) {
-        printf("Choose a command:\n"
-            "\t[1] List peers\n"
-            "\t[2] Get peers\n"
-            "\t[3] List local files\n"
-            "\t[4] Get files -> WIP\n"
-            "\t[5] Exhibit statistics -> WIP\n"
-            "\t[6] Change chunk size -> WIP\n"
-            "\t[9] Exit\n");
+        printf("Escolha um comando:\n"
+            "\t[1] Listar peers\n"
+            "\t[2] Obter peers\n"
+            "\t[3] Listar arquivos locais\n"
+            "\t[4] Buscar arquivos -> WIP\n"
+            "\t[5] Exibir estatisticas -> WIP\n"
+            "\t[6] Alterar tamanho da chunk -> WIP\n"
+            "\t[9] Sair\n");
         printf(">");
         if(scanf("%d", &comm) != 1) {
             while(getchar() != '\n');
-            printf("Unexpected command\n");
+            printf("Comando inesperado\n");
             continue;
         }
         switch(comm) {
@@ -207,11 +220,11 @@ int main(int argc, char **argv)
             // change_chunk_size();
             break;
         case 9:
-            printf("Exiting...\n");
+            printf("Saindo...\n");
             should_quit = true;
             break;
         default:
-            printf("Unexpected command\n");
+            printf("Comando inesperado\n");
             break;
         }
     }
