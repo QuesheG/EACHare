@@ -28,6 +28,8 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
 $(OBJ_DIR):
 	mkdir $@
 
+clean_all: clean clean_testing
+
 clean:
 	$(REMOVE) $(OBJ_DIR)
 
