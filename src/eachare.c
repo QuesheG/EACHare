@@ -94,7 +94,7 @@ void *listen_socket(void *args)
         case HELLO:
             if((*peers)[i].status == OFFLINE) {
                 (*peers)[i].status = ONLINE;
-                printf("\tAtualizando peer %s:%d para status ONLINE\n", inet_ntoa((*peers)[i].con.sin_addr), ntohs((*peers)[i].con.sin_port));
+                printf("\tAtualizando peer %s:%d status ONLINE\n", inet_ntoa((*peers)[i].con.sin_addr), ntohs((*peers)[i].con.sin_port));
             }
             break;
         case GET_PEERS:
@@ -109,7 +109,7 @@ void *listen_socket(void *args)
             break;
         case BYE:
             (*peers)[i].status = OFFLINE;
-            printf("\tAtualizando peer %s:%d para status OFFLINE\n", inet_ntoa((*peers)[i].con.sin_addr), ntohs((*peers)[i].con.sin_port));
+            printf("\tAtualizando peer %s:%d status OFFLINE\n", inet_ntoa((*peers)[i].con.sin_addr), ntohs((*peers)[i].con.sin_port));
         default:
             printf("\tTipo de mensagem nao reconhecido\n");
             break;

@@ -38,3 +38,5 @@ Problema list_peer
 Problema build_msg
 
 Problema recebimento
+
+only change status (after GET_PEERS) when receive PEER_LIST

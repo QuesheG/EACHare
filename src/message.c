@@ -170,13 +170,13 @@ void send_message(const char *msg, peer *neighbour, MSG_TYPE msg_type) {
         case HELLO:
             if(neighbour->status == ONLINE) {
                 neighbour->status = OFFLINE;
-                printf("Atualizando peer %s:%d status OFFLINE\n", inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port));
+                printf("\tAtualizando peer %s:%d status OFFLINE\n", inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port));
             }
             break;
         case GET_PEERS:
             if(neighbour->status == ONLINE) {
                 neighbour->status = OFFLINE;
-                printf("Atualizando peer %s:%d status OFFLINE\n", inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port));
+                printf("\tAtualizando peer %s:%d status OFFLINE\n", inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port));
             }
             break;
         default:
@@ -213,7 +213,7 @@ MSG_TYPE read_message(const char *buf, int *clock, peer *sender) {
 // check if message received was read fully
 char *check_msg_full(const char *buf, SOCKET sock, int *rec_peers_size, int *valread) {
     bool is_full_msg = false;
-    if(*valread == 50) {
+    if(*valread == MSG_SIZE - 1) {
         for(int i = 0; i < *valread; i++) {
             if(buf[i] == '\n') {
                 is_full_msg = true;
