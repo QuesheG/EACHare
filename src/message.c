@@ -67,7 +67,6 @@ void share_peers_list(peer server, int *clock, pthread_mutex_t *clock_lock, peer
     args.sender = *sender;
     args.peers = peers;
     args.peers_size = peers_size;
-    printf("\n%s:%d\n\n", inet_ntoa(server.con.sin_addr), (server.con.sin_port));
     char *msg = build_message(server.con, *clock, PEER_LIST, (void *)&args);
     pthread_mutex_lock(clock_lock);
     (*clock)++;
@@ -109,7 +108,7 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
         }
         msg = temp;
         int argumento_sem_nome_ainda = 0;
-        sprintf(msg, "%s:%d %d PEER_LIST %d", ip, (int)ntohs(sender_ip.sin_port), clock, peers_size - 1); // TODO: analyse why do it return wrong with sender_ip
+        sprintf(msg, "%s:%d %d PEER_LIST %d", ip, (int)ntohs(sender_ip.sin_port), clock, peers_size - 1);
         for(int i = 0; i < peers_size; i++) {
             if(is_same_peer(sender, peers[i]))
                 continue;
@@ -147,19 +146,19 @@ void send_message(const char *msg, peer *neighbour, MSG_TYPE msg_type) {
         return;
     }
     size_t len = strlen(msg);
-    printf("Encaminhando mensagem \"%.*s\" para %s:%d\n", (int)strcspn(msg, "\n"), msg, inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port));
+    printf("\tEncaminhando mensagem \"%.*s\" para %s:%d\n", (int)strcspn(msg, "\n"), msg, inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port));
     if(send(server_soc, msg, len + 1, 0) == len + 1) {
         switch(msg_type) {
         case HELLO:
             if(neighbour->status == OFFLINE) {
                 neighbour->status = ONLINE;
-                printf("Atualizando peer %s:%d status ONLINE\n", inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port));
+                printf("\tAtualizando peer %s:%d status ONLINE\n", inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port));
             }
             break;
         case GET_PEERS:
             if(neighbour->status == OFFLINE) {
                 neighbour->status = ONLINE;
-                printf("Atualizando peer %s:%d status ONLINE\n", inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port));
+                printf("\tAtualizando peer %s:%d status ONLINE\n", inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port)); // TODO: only change status when receive PEER_LIST
             }
             break;
         default:
@@ -195,7 +194,7 @@ MSG_TYPE read_message(const char *buf, int *clock, peer *sender) {
     int aclock = atoi(strtok(NULL, " "));
     char *tok_msg = strtok(NULL, " ");
     aclock = aclock; // FIXME: melhor jeito de tirar mensagem de variável inútil
-    
+
     if(tok_msg) {
         tok_msg[strcspn(tok_msg, "\n")] = '\0';
     }

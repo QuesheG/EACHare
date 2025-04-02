@@ -48,14 +48,14 @@ peer *create_peers(const char **peers_ip, size_t peers_size) {
         return NULL;
     }
     for(int i = 0; i < peers_size; i++) {
-        printf("Adding new peer %s status OFFLINE\n", peers_ip[i]);
+        printf("Adicionando novo peer %s status OFFLINE\n", peers_ip[i]);
         create_address(&peers[i], peers_ip[i]);
     }
     return peers;
 }
 
 // append new peer
-void append_peer(peer **peers, size_t *peers_size, peer new_peer) {
+void append_peer(peer **peers, size_t *peers_size, peer new_peer, int *i, char *file) {
     peer *new_peers = realloc(*peers, (*peers_size + 1) * sizeof(peer));
     if(!new_peers) {
         fprintf(stderr, "Failed to allocate memory");
@@ -64,6 +64,13 @@ void append_peer(peer **peers, size_t *peers_size, peer new_peer) {
     *peers = new_peers;
     (*peers)[*peers_size] = new_peer;
     (*peers_size)++;
+
+    FILE *f = fopen(file, "a");
+    (*i) = *peers_size - 1;
+    fprintf(f, "%s:%d\n", inet_ntoa((*peers)[(*i)].con.sin_addr), ntohs((*peers)[(*i)].con.sin_port));
+    fclose(f);
+
+    printf("\tAdicionando novo peer %s:%d status OFFLINE\n", inet_ntoa((*peers)[(*i)].con.sin_addr), ntohs((*peers)[(*i)].con.sin_port));
 }
 
 // check if peer is in list of known peers
