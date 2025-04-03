@@ -1,6 +1,6 @@
-#include <sock.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <sock.h>
 
 #ifdef WIN
 int init_win_sock(void) {

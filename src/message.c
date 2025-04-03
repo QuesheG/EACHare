@@ -4,6 +4,7 @@
 #include <sock.h>
 #include <message.h>
 #include <peer.h>
+#include <threading.h>
 
 // print the peers in list
 void show_peers(peer server, int *clock, pthread_mutex_t *clock_lock, peer *peers, size_t peers_size) {
@@ -58,6 +59,7 @@ void get_peers(peer server, int *clock, pthread_mutex_t *clock_lock, peer *peers
         pthread_mutex_unlock(clock_lock);
         printf("\t=> Atualizando relogio para %d\n", *clock);
         send_message(msg, &peers[i], GET_PEERS);
+        mssleep(500);
     }
 }
 

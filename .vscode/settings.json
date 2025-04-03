@@ -13,7 +13,9 @@
         "dir.h": "c",
         "io.h": "c",
         "file.h": "c",
-        "types.h": "c"
+        "types.h": "c",
+        "time.h": "c",
+        "message.h": "c"
     },
     "C_Cpp.formatting": "vcFormat",
     "C_Cpp.vcFormat.space.beforeBlockOpenBrace": true,
