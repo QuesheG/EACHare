@@ -33,10 +33,6 @@ python testing.py
 
 Resposta recebida depois de get_peers seguindo relatório
 
-Problema list_peer
-
 Problema build_msg
 
-Problema recebimento
-
-only change status (after GET_PEERS) when receive PEER_LIST
+Problema recebimento (threads)

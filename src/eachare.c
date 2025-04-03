@@ -39,12 +39,12 @@ void *listen_socket(void *args)
     int opt = 1;
     SOCKET server_soc;
     if(!create_server(&server_soc, server.con, opt)) {
-        fprintf(stderr, "Erro: Falha com criacao de server\n");
+        fprintf(stderr, "\nErro: Falha com criacao de server\n");
         show_soc_error();
         return NULL;
     }
     if(listen(server_soc, 3) != 0) {
-        fprintf(stderr, "Erro: Falha colocando socket para escutar\n");
+        fprintf(stderr, "\nErro: Falha colocando socket para escutar\n");
         show_soc_error();
         return NULL;
     }
@@ -55,7 +55,7 @@ void *listen_socket(void *args)
         // accept() não leva o endereço do server, e sim o endereço que o cliente se conectando tem!
         SOCKET n_sock = accept(server_soc, (struct sockaddr *)&(client.con), &addrlen);
         if(is_invalid_sock(n_sock) && !should_quit) {
-            fprintf(stderr, "Erro: Falha aceitando socket de conexao\n");
+            fprintf(stderr, "\nErro: Falha aceitando socket de conexao\n");
         }
         if(should_quit) return NULL;
 
@@ -66,7 +66,7 @@ void *listen_socket(void *args)
         ssize_t valread = recv(n_sock, buf, MSG_SIZE - 1, 0);
 
         if(valread <= 0 && !should_quit) {
-            fprintf(stderr, "Erro: Falha lendo mensagem de vizinho\n");
+            fprintf(stderr, "\nErro: Falha lendo mensagem de vizinho\n");
             continue;
         }
 
@@ -88,33 +88,42 @@ void *listen_socket(void *args)
         MSG_TYPE msg_type = read_message(buf, clock, &sender);
         int i = peer_in_list(sender, *peers, *peers_size);
         if(i < 0) {
-            append_peer(peers, peers_size, sender, &i, file);
+            sender.status = ONLINE;
+            int res = append_peer(peers, peers_size, sender, &i, file);
+            if(res == -1) continue;
         }
         switch(msg_type) {
         case HELLO:
             if((*peers)[i].status == OFFLINE) {
                 (*peers)[i].status = ONLINE;
-                printf("\tAtualizando peer %s:%d status ONLINE\n", inet_ntoa((*peers)[i].con.sin_addr), ntohs((*peers)[i].con.sin_port));
+                printf("\tAtualizando peer %s:%d status %s\n", inet_ntoa((*peers)[i].con.sin_addr), ntohs((*peers)[i].con.sin_port), status_string[1]);
             }
             break;
         case GET_PEERS:
             if((*peers)[i].status == OFFLINE) {
                 (*peers)[i].status = ONLINE;
-                printf("\tAtualizando peer %s:%d para status ONLINE\n", inet_ntoa((*peers)[i].con.sin_addr), ntohs((*peers)[i].con.sin_port));
+                printf("\tAtualizando peer %s:%d para status %s\n", inet_ntoa((*peers)[i].con.sin_addr), ntohs((*peers)[i].con.sin_port), status_string[1]);
             }
             share_peers_list(server, clock, &clock_lock, &(*peers)[i], *peers, *peers_size);
             break;
         case PEER_LIST:
-            append_list_peers(buf, peers, peers_size, rec_peers_size);
+            if((*peers)[i].status == OFFLINE) {
+                (*peers)[i].status = ONLINE;
+                printf("\tAtualizando peer %s:%d para status %s\n", inet_ntoa((*peers)[i].con.sin_addr), ntohs((*peers)[i].con.sin_port), status_string[1]);
+            }
+            append_list_peers(buf, peers, peers_size, rec_peers_size, file);
             break;
         case BYE:
-            (*peers)[i].status = OFFLINE;
-            printf("\tAtualizando peer %s:%d status OFFLINE\n", inet_ntoa((*peers)[i].con.sin_addr), ntohs((*peers)[i].con.sin_port));
+            if((*peers)[i].status == ONLINE) {
+                (*peers)[i].status = OFFLINE;
+                printf("\tAtualizando peer %s:%d para status %s\n", inet_ntoa((*peers)[i].con.sin_addr), ntohs((*peers)[i].con.sin_port), status_string[0]);
+            }
+            break;
         default:
             printf("\tTipo de mensagem nao reconhecido\n");
             break;
         }
-        printf(">");
+        if(msg_type != PEER_LIST) printf(">");
         sock_close(n_sock);
     }
     sock_close(server_soc);

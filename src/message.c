@@ -13,9 +13,9 @@ void show_peers(peer server, int *clock, pthread_mutex_t *clock_lock, peer *peer
     for(int i = 0; i < peers_size; i++) {
         printf("\t[%d] %s:%u ", i + 1, inet_ntoa(peers[i].con.sin_addr), ntohs(peers[i].con.sin_port));
         if(peers[i].status == ONLINE)
-            printf("ONLINE\n");
+            printf("%s\n", status_string[1]);
         else
-            printf("OFFLINE\n");
+            printf("%s\n", status_string[0]);
     }
 
     int input;
@@ -113,8 +113,8 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
             if(is_same_peer(sender, peers[i]))
                 continue;
             sprintf(msg, "%s ", msg);
-            if(peers[i].status == ONLINE) sprintf(msg, "%s%s:%d:ONLINE:%d", msg, inet_ntoa(peers[i].con.sin_addr), ntohs(peers[i].con.sin_port), argumento_sem_nome_ainda);
-            else sprintf(msg, "%s%s:%d:OFFLINE:%d", msg, inet_ntoa(peers[i].con.sin_addr), ntohs(peers[i].con.sin_port), argumento_sem_nome_ainda);
+            if(peers[i].status == ONLINE) sprintf(msg, "%s%s:%d:%s:%d", msg, inet_ntoa(peers[i].con.sin_addr), ntohs(peers[i].con.sin_port), status_string[1], argumento_sem_nome_ainda);
+            else sprintf(msg, "%s%s:%d:%s:%d", msg, inet_ntoa(peers[i].con.sin_addr), ntohs(peers[i].con.sin_port), status_string[0], argumento_sem_nome_ainda);
         }
         sprintf(msg, "%s\n", msg);
         break;
@@ -131,17 +131,17 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
 // send a built message to an known peer socket
 void send_message(const char *msg, peer *neighbour, MSG_TYPE msg_type) {
     if(!msg) {
-        fprintf(stderr, "Erro: Mensagem de envio vazia!\n");
+        fprintf(stderr, "\nErro: Mensagem de envio vazia!\n");
         return;
     }
     SOCKET server_soc = socket(AF_INET, SOCK_STREAM, 0);
     if(is_invalid_sock(server_soc)) {
-        fprintf(stderr, "Erro: Falha na criacao do socket");
+        fprintf(stderr, "\nErro: Falha na criacao do socket");
         show_soc_error();
         return;
     }
     if(connect(server_soc, (const struct sockaddr *)&(neighbour->con), sizeof(neighbour->con)) != 0) {
-        fprintf(stderr, "Erro: Falha ao conectar ao peer\n");
+        fprintf(stderr, "\nErro: Falha ao conectar ao peer\n");
         show_soc_error();
         return;
     }
@@ -152,14 +152,10 @@ void send_message(const char *msg, peer *neighbour, MSG_TYPE msg_type) {
         case HELLO:
             if(neighbour->status == OFFLINE) {
                 neighbour->status = ONLINE;
-                printf("\tAtualizando peer %s:%d status ONLINE\n", inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port));
+                printf("\tAtualizando peer %s:%d status %s\n", inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port), status_string[1]);
             }
             break;
         case GET_PEERS:
-            if(neighbour->status == OFFLINE) {
-                neighbour->status = ONLINE;
-                printf("\tAtualizando peer %s:%d status ONLINE\n", inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port)); // TODO: only change status when receive PEER_LIST
-            }
             break;
         default:
             break;
@@ -170,13 +166,13 @@ void send_message(const char *msg, peer *neighbour, MSG_TYPE msg_type) {
         case HELLO:
             if(neighbour->status == ONLINE) {
                 neighbour->status = OFFLINE;
-                printf("\tAtualizando peer %s:%d status OFFLINE\n", inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port));
+                printf("\tAtualizando peer %s:%d status %s\n", inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port), status_string[0]);
             }
             break;
         case GET_PEERS:
             if(neighbour->status == ONLINE) {
                 neighbour->status = OFFLINE;
-                printf("\tAtualizando peer %s:%d status OFFLINE\n", inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port));
+                printf("\tAtualizando peer %s:%d status %s\n", inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port), status_string[0]);
             }
             break;
         default:
@@ -224,20 +220,23 @@ char *check_msg_full(const char *buf, SOCKET sock, int *rec_peers_size, int *val
             int spaces = 0;
             char *duplicate;
             for(int i = 0; i < *valread; i++) {
-                if(buf[i] == ' ') spaces++;
-                if(spaces == 3) {
-                    duplicate = strdup(&buf[i]);
-                }
-                if(spaces == 4) {
-                    duplicate[i] = '\0';
-                    *rec_peers_size = atoi(duplicate);
-                    int new_size = alt_msg_size(*rec_peers_size);
-                    char *aux_buf;
-                    aux_buf = malloc(sizeof(char) * new_size);
-                    if(!aux_buf) return NULL;
-                    sprintf(aux_buf, "%s", buf);
-                    *valread += recv(sock, &aux_buf[*valread], new_size, 0);
-                    return aux_buf;
+                if(buf[i] == ' ') {
+                    spaces++;
+                    if(spaces == 3) {
+                        duplicate = strdup(&buf[i + 1]);
+                    }
+                    if(spaces == 4 && duplicate) {
+                        duplicate[strcspn(duplicate, " ")] = '\0';
+                        *rec_peers_size = atoi(duplicate);
+                        free(duplicate);
+                        int new_size = alt_msg_size(*rec_peers_size);
+                        char *aux_buf;
+                        aux_buf = malloc(sizeof(char) * new_size);
+                        if(!aux_buf) return NULL;
+                        sprintf(aux_buf, "%s", buf);
+                        *valread += recv(sock, &aux_buf[*valread], new_size, 0);
+                        return aux_buf;
+                    }
                 }
             }
         }
@@ -246,19 +245,40 @@ char *check_msg_full(const char *buf, SOCKET sock, int *rec_peers_size, int *val
 }
 
 // append received list to known peer list
-void append_list_peers(const char *buf, peer **peers, size_t *peers_size, size_t rec_peers_size) {
+void append_list_peers(const char *buf, peer **peers, size_t *peers_size, size_t rec_peers_size, char *file) {
     char *cpy = strdup(buf);
     strtok(cpy, " "); //ip
     strtok(NULL, " ");//clock
     strtok(NULL, " ");//type
     strtok(NULL, " ");//size
     char *list = strtok(NULL, " \n");
-    cpy = strdup(list);
-    char *p = strtok(cpy, " ");
-    int times = 0;
+
+    if(!list) {
+        fprintf(stderr, "Error: No peer list found!\n");
+        free(cpy);
+        return;
+    }
+
+    char *p = NULL;
     peer *rec_peers_list = malloc(sizeof(peer) * rec_peers_size);
+
+    if(!rec_peers_list) {
+        fprintf(stderr, "Failed to allocate memory");
+        free(cpy);
+        free(p);
+        return;
+    }
+
     for(int i = 0; i < rec_peers_size; i++) {
-        char *infon = strtok(p, ":");
+        int space_index = strcspn(list, " ");
+        p = strdup(list);
+        char *peer_entry = strtok(p, " ");
+        if(!peer_entry) {
+            break;
+        }
+        list = strdup(&list[space_index + 1]);
+
+        char *infon = strtok(peer_entry, ":");
         for(int j = 0; j < 4; j++) { //hardcoding infos size :D => ip1:port2:status3:num4
             if(j == 0) rec_peers_list[i].con.sin_addr.s_addr = inet_addr(infon);
             if(j == 1) rec_peers_list[i].con.sin_port = htons((unsigned short)atoi(infon));
@@ -269,15 +289,7 @@ void append_list_peers(const char *buf, peer **peers, size_t *peers_size, size_t
             if(j == 3); // FIXME: numero aleatorio jogado fora por enquanto;
             infon = strtok(NULL, ":");
         }
-        times += 1;
-        cpy = strdup(list);
-        for(int j = 0; j <= times; j++) {
-            if(j == 0) p = strtok(cpy, " ");
-            else p = strtok(NULL, " ");
-        }
-    }
-    //TODO: FIXME: APPEND UNKNOWN REC_PEERS_LIST TO PEERS;
-    for(int i = 0; i < rec_peers_size; i++) {
+
         bool add = true;
         for(int j = 0; j < *peers_size; j++) {
             if(is_same_peer(rec_peers_list[i], (*peers)[j])) {
@@ -286,14 +298,18 @@ void append_list_peers(const char *buf, peer **peers, size_t *peers_size, size_t
             }
         }
         if(add) {
-            peer *temp = realloc(*peers, sizeof(peer) * (*peers_size + 1));
-            if(!temp) free(rec_peers_list);
-            *peers = temp;
-            (*peers)[*peers_size] = rec_peers_list[i];
-            *peers_size += 1;
+            int j;
+            int res = append_peer(peers, peers_size, rec_peers_list[i], &j, file);
+            if(res == -1) free(rec_peers_list);
         }
+
+        free(peer_entry);
     }
-    //TODO: Append in file
+
+    free(cpy);
+    free(list);
+    if(p) free(p);
+    free(rec_peers_list);
 }
 
 // send a bye message to every peer in list

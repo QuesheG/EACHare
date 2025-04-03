@@ -4,6 +4,8 @@
 #include <sock.h>
 #include <peer.h>
 
+char *status_string[] = { "OFFLINE", "ONLINE" };
+
 // compare two peers
 bool is_same_peer(peer a, peer b) {
     return (strcmp(inet_ntoa(a.con.sin_addr), inet_ntoa(b.con.sin_addr)) == 0 && (a.con.sin_port == b.con.sin_port));
@@ -48,18 +50,18 @@ peer *create_peers(const char **peers_ip, size_t peers_size) {
         return NULL;
     }
     for(int i = 0; i < peers_size; i++) {
-        printf("Adicionando novo peer %s status OFFLINE\n", peers_ip[i]);
+        printf("Adicionando novo peer %s status %s\n", peers_ip[i], status_string[0]);
         create_address(&peers[i], peers_ip[i]);
     }
     return peers;
 }
 
 // append new peer
-void append_peer(peer **peers, size_t *peers_size, peer new_peer, int *i, char *file) {
+int append_peer(peer **peers, size_t *peers_size, peer new_peer, int *i, char *file) {
     peer *new_peers = realloc(*peers, (*peers_size + 1) * sizeof(peer));
     if(!new_peers) {
         fprintf(stderr, "Failed to allocate memory");
-        return;
+        return -1;
     }
     *peers = new_peers;
     (*peers)[*peers_size] = new_peer;
@@ -69,8 +71,9 @@ void append_peer(peer **peers, size_t *peers_size, peer new_peer, int *i, char *
     (*i) = *peers_size - 1;
     fprintf(f, "%s:%d\n", inet_ntoa((*peers)[(*i)].con.sin_addr), ntohs((*peers)[(*i)].con.sin_port));
     fclose(f);
+    printf("\tAdicionando novo peer %s:%d status %s\n", inet_ntoa((*peers)[(*i)].con.sin_addr), ntohs((*peers)[(*i)].con.sin_port), status_string[(*peers)[(*i)].status]);
 
-    printf("\tAdicionando novo peer %s:%d status OFFLINE\n", inet_ntoa((*peers)[(*i)].con.sin_addr), ntohs((*peers)[(*i)].con.sin_port));
+    return 1;
 }
 
 // check if peer is in list of known peers
