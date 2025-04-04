@@ -265,7 +265,7 @@ void append_list_peers(const char *buf, peer **peers, size_t *peers_size, size_t
     strtok(NULL, " ");//clock
     strtok(NULL, " ");//type
     strtok(NULL, " ");//size
-    char *list = strtok(NULL, " \n");
+    char *list = strtok(NULL, "\n");
 
     if(!list) {
         fprintf(stderr, "Erro: Lista de peers nao encontrada!\n");
