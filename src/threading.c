@@ -1,10 +1,12 @@
+#include <stdlib.h>
 #include <threading.h>
 
 void mssleep(uint64_t ms) {
     #ifdef _WIN32
     Sleep(ms);
     #else
-    nanosleep(ms*1000000);
+    struct timespec a = {0, msg*1000000};
+    nanosleep(&a, NULL);
     #endif
 }
 

@@ -1,13 +1,14 @@
-#include <stdio.h>
-#include <file.h>
-#include <stdlib.h>
-#include <sys/types.h>
 #include <dirent.h>
 #include <stdbool.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
 
-#include <sock.h>
-#include <peer.h>
+#include <file.h>
 #include <message.h>
+#include <peer.h>
+#include <sock.h>
 #include <threading.h>
 
 bool should_quit = false;

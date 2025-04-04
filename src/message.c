@@ -110,7 +110,7 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
         }
         msg = temp;
         int argumento_sem_nome_ainda = 0;
-        sprintf(msg, "%s:%d %d PEER_LIST %d", ip, (int)ntohs(sender_ip.sin_port), clock, peers_size - 1);
+        sprintf(msg, "%s:%d %d PEER_LIST %ld", ip, (int)ntohs(sender_ip.sin_port), clock, peers_size - 1);
         for(int i = 0; i < peers_size; i++) {
             if(is_same_peer(sender, peers[i]))
                 continue;
@@ -209,7 +209,7 @@ MSG_TYPE read_message(const char *buf, int *clock, peer *sender) {
 }
 
 // check if message received was read fully
-char *check_msg_full(const char *buf, SOCKET sock, int *rec_peers_size, int *valread) {
+char *check_msg_full(const char *buf, SOCKET sock, int *rec_peers_size, ssize_t *valread) {
     bool is_full_msg = false;
     if(*valread == MSG_SIZE - 1) {
         for(int i = 0; i < *valread; i++) {
