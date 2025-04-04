@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <file.h>
 #include <sock.h>
 #include <message.h>

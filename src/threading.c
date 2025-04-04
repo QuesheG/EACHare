@@ -5,7 +5,7 @@ void mssleep(uint64_t ms) {
     #ifdef _WIN32
     Sleep(ms);
     #else
-    struct timespec a = {0, msg*1000000};
+    struct timespec a = {0, ms*1000000};
     nanosleep(&a, NULL);
     #endif
 }
