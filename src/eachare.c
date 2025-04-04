@@ -39,18 +39,20 @@ void *treat_request(void *args) {
     }
     
     buf[valread] = '\0';
+    
+    peer sender;
+    MSG_TYPE msg_type = read_message(buf, clock, &sender);
     printf("\n");
-    printf("\tMensagem recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
+    if(msg_type == PEER_LIST) printf("\tResposta recebida: \"%.*s\"\n", (int) strcspn(buf, "\n"), buf);
+    else printf("\tMensagem recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
     pthread_mutex_lock(&clock_lock);
     (*clock)++;
     pthread_mutex_unlock(&clock_lock);
     printf("\t=> Atualizando relogio para %d\n", *clock);
-    
-    peer sender;
-    MSG_TYPE msg_type = read_message(buf, clock, &sender);
     int i = peer_in_list(sender, *peers, *peers_size);
     if(i < 0) {
         sender.status = ONLINE;
+        sender.con.sin_family = AF_INET;
         int res = append_peer(peers, peers_size, sender, &i, file);
         if(res == -1) return NULL;
     }

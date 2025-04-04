@@ -256,7 +256,7 @@ void append_list_peers(const char *buf, peer **peers, size_t *peers_size, size_t
     char *list = strtok(NULL, " \n");
 
     if(!list) {
-        fprintf(stderr, "Error: No peer list found!\n");
+        fprintf(stderr, "Erro: Lista de peers nao encontrada!\n");
         free(cpy);
         return;
     }
@@ -265,7 +265,7 @@ void append_list_peers(const char *buf, peer **peers, size_t *peers_size, size_t
     peer *rec_peers_list = malloc(sizeof(peer) * rec_peers_size);
 
     if(!rec_peers_list) {
-        fprintf(stderr, "Failed to allocate memory");
+        fprintf(stderr, "Erro: Falha na alocacao de memoria");
         free(cpy);
         free(p);
         return;
@@ -301,6 +301,7 @@ void append_list_peers(const char *buf, peer **peers, size_t *peers_size, size_t
         }
         if(add) {
             int j;
+            rec_peers_list[i].con.sin_family = AF_INET;
             int res = append_peer(peers, peers_size, rec_peers_list[i], &j, file);
             if(res == -1) free(rec_peers_list);
         }

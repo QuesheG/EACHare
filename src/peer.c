@@ -5,6 +5,8 @@
 #include <peer.h>
 
 char *status_string[] = { "OFFLINE", "ONLINE" };
+// TODO: array para enum de mensagens
+// TODO: make peer func && print peer func
 
 // compare two peers
 bool is_same_peer(peer a, peer b) {
@@ -60,8 +62,8 @@ peer *create_peers(const char **peers_ip, size_t peers_size) {
 int append_peer(peer **peers, size_t *peers_size, peer new_peer, int *i, char *file) {
     peer *new_peers = realloc(*peers, (*peers_size + 1) * sizeof(peer));
     if(!new_peers) {
-        fprintf(stderr, "Failed to allocate memory");
-        return -1;
+        fprintf(stderr, "Erro: Falha na alocacao de memoria");
+        return -1; // FIXME: tratar possivel erro
     }
     *peers = new_peers;
     (*peers)[*peers_size] = new_peer;
