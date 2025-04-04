@@ -113,7 +113,7 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
         }
         msg = temp;
         int argumento_sem_nome_ainda = 0;
-        sprintf(msg, "%s:%d %d PEER_LIST %ld", ip, (int)ntohs(sender_ip.sin_port), clock, peers_size - 1);
+        sprintf(msg, "%s:%d %d PEER_LIST %ld", ip, (int)ntohs(sender_ip.sin_port), clock, (uint64_t)peers_size - 1);
         for(int i = 0; i < peers_size; i++) {
             if(is_same_peer(sender, peers[i]))
                 continue;
@@ -148,6 +148,7 @@ void send_message(const char *msg, peer *neighbour, MSG_TYPE msg_type) {
     if(connect(server_soc, (const struct sockaddr *)&(neighbour->con), sizeof(neighbour->con)) != 0) {
         fprintf(stderr, "\nErro: Falha ao conectar ao peer\n");
         show_soc_error();
+        sock_close(server_soc);
         return;
     }
     size_t len = strlen(msg);
@@ -281,17 +282,14 @@ void append_list_peers(const char *buf, peer **peers, size_t *peers_size, size_t
         free(p);
         return;
     }
-
+    size_t spc_cnt = 0;
     for(int i = 0; i < rec_peers_size; i++) {
-        int space_index = strcspn(list, " ");
-        p = strdup(list);
-        char *peer_entry = strtok(p, " ");
-        if(!peer_entry) {
-            break;
+        char *cpy_l = strdup(list);
+        for(int j = 0; j < spc_cnt + 1; j++) {
+            if(j==0) p = strtok(cpy_l, " ");
+            else p = strtok(NULL, " ");
         }
-        list = strdup(&list[space_index + 1]);
-
-        char *infon = strtok(peer_entry, ":");
+        char *infon = strtok(p, ":");
         for(int j = 0; j < 4; j++) { //hardcoding infos size :D => ip1:port2:status3:num4
             if(j == 0) rec_peers_list[i].con.sin_addr.s_addr = inet_addr(infon);
             if(j == 1) rec_peers_list[i].con.sin_port = htons((unsigned short)atoi(infon));
@@ -316,13 +314,11 @@ void append_list_peers(const char *buf, peer **peers, size_t *peers_size, size_t
             int res = append_peer(peers, peers_size, rec_peers_list[i], &j, file);
             if(res == -1) free(rec_peers_list);
         }
-
-        free(peer_entry);
+        spc_cnt++;
+        free(cpy_l);
     }
 
     free(cpy);
-    free(list);
-    if(p) free(p);
     free(rec_peers_list);
 }
 
