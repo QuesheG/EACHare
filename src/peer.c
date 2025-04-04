@@ -23,6 +23,7 @@ void create_address(peer *address, const char *ip) {
     address->con.sin_family = AF_INET;
     address->con.sin_port = htons((unsigned short)(atoi(tokport))); // make string into int, then the int into short, then the short into a network byte order short
     address->status = OFFLINE;
+    free(ip_cpy);
 }
 
 // bind a server to the socket

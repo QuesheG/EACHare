@@ -62,6 +62,7 @@ void get_peers(peer server, int *clock, pthread_mutex_t *clock_lock, peer *peers
         send_message(msg, &peers[i], GET_PEERS);
         mssleep(500);
     }
+    free(msg);
 }
 
 // share the peers list with who requested
@@ -76,6 +77,7 @@ void share_peers_list(peer server, int *clock, pthread_mutex_t *clock_lock, peer
     pthread_mutex_unlock(clock_lock);
     printf("\t=> Atualizando relogio para %d\n", *clock);
     send_message(msg, sender, PEER_LIST);
+    free(msg);
 }
 
 // create a message with the sender ip, its clock and the message type
@@ -198,14 +200,22 @@ MSG_TYPE read_message(const char *buf, int *clock, peer *sender) {
         tok_msg[strcspn(tok_msg, "\n")] = '\0';
     }
     create_address(sender, tok_ip);
-    if(strcmp(tok_msg, "HELLO") == 0)
+    if(strcmp(tok_msg, "HELLO") == 0) {
+        free(buf_cpy);
         return HELLO;
-    if(strcmp(tok_msg, "GET_PEERS") == 0)
+    }
+    if(strcmp(tok_msg, "GET_PEERS") == 0) {
+        free(buf_cpy);
         return GET_PEERS;
-    if(strcmp(tok_msg, "PEER_LIST") == 0)
+    }
+    if(strcmp(tok_msg, "PEER_LIST") == 0) {
+        free(buf_cpy);
         return PEER_LIST;
-    if(strcmp(tok_msg, "BYE") == 0)
+    }
+    if(strcmp(tok_msg, "BYE") == 0) {
+        free(buf_cpy);
         return BYE;
+    }
     return UNEXPECTED_MSG_TYPE;
 }
 
@@ -322,6 +332,7 @@ void bye_peers(peer server, int *clock, peer *peers, size_t peers_size) {
         if(peers[i].status == ONLINE) {
             char *msg = build_message(server.con, *clock, BYE, NULL);
             send_message(msg, &peers[i], BYE);
+            free(msg);
         }
     }
 }

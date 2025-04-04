@@ -36,6 +36,7 @@ void *treat_request(void *args) {
     int rec_peers_size = 0;
     char *temp = check_msg_full(buf, n_sock, &rec_peers_size, &valread);
     if(temp) {
+        free(buf);
         buf = temp;
     }
 
@@ -248,6 +249,7 @@ int main(int argc, char **argv)
     bye_peers(server, &loc_clock, *peers, *peers_size);
     free(*peers);
     free(peers);
+    free(peers_size);
     free(args);
     free(files);
     closedir(shared_dir);
