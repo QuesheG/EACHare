@@ -20,6 +20,8 @@ void show_peers(peer server, int *clock, pthread_mutex_t *clock_lock, peer *peer
             printf("%s\n", status_string[0]);
     }
 
+    printf(">");
+
     int input;
     if(scanf("%d", &input) != 1) {
         while(getchar() != '\n');
@@ -286,7 +288,7 @@ void append_list_peers(const char *buf, peer **peers, size_t *peers_size, size_t
     for(int i = 0; i < rec_peers_size; i++) {
         char *cpy_l = strdup(list);
         for(int j = 0; j < spc_cnt + 1; j++) {
-            if(j==0) p = strtok(cpy_l, " ");
+            if(j == 0) p = strtok(cpy_l, " ");
             else p = strtok(NULL, " ");
         }
         char *infon = strtok(p, ":");

@@ -71,6 +71,10 @@ char **get_dir_files(DIR *dir, size_t *len) {
 
 //list filenames in memory
 void show_files(char **files, size_t file_len) {
+    if(file_len <= 0) {
+        printf("Nao foi possivel encontrar arquivos\n");
+        return;
+    }
     for(int i = 0; i < file_len; i++) {
         printf("  %s\n", files[i]);
     }
