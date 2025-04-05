@@ -281,7 +281,6 @@ void append_list_peers(const char *buf, peer **peers, size_t *peers_size, size_t
     if(!rec_peers_list) {
         fprintf(stderr, "Erro: Falha na alocacao de memoria");
         free(cpy);
-        free(p);
         return;
     }
     size_t spc_cnt = 0;
