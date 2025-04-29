@@ -33,20 +33,33 @@ void *treat_request(void *args) {
         return NULL;
     }
 
-    int rec_peers_size = 0;
-    char *temp = check_msg_full(buf, n_sock, &rec_peers_size, &valread);
+    peer sender;
+    MSG_TYPE msg_type = read_message(buf, &sender);
+    char arg = 0;
+    switch(msg_type) {
+        case LS:
+            //TODO: alocar arg baseado no tipo da mensagem
+            break;
+        case DL:
+            //TODO: alocar arg baseado no tipo da mensagem
+            break;
+        default:
+            break;
+    }
+    char *temp = check_msg_full(buf, n_sock, msg_type, (void *)&arg, &valread);
     if(temp) {
         free(buf);
         buf = temp;
     }
 
     buf[valread] = '\0';
+
+    pthread_mutex_lock(&clock_lock);
+    *clock = max(*clock, sender.p_clock);
+    pthread_mutex_unlock(&clock_lock);
     
-    peer sender;
-    MSG_TYPE msg_type = read_message(buf, clock, &sender);
     printf("\n");
-    if(msg_type == PEER_LIST) printf("\tResposta recebida: \"%.*s\"\n", (int) strcspn(buf, "\n"), buf);
-    else printf("\tMensagem recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
+    printf("\tMensagem recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
     pthread_mutex_lock(&clock_lock);
     (*clock)++;
     pthread_mutex_unlock(&clock_lock);
@@ -54,30 +67,23 @@ void *treat_request(void *args) {
     int i = peer_in_list(sender, *peers, *peers_size);
     if(i < 0) {
         sender.status = ONLINE;
-        sender.con.sin_family = AF_INET;
         int res = append_peer(peers, peers_size, sender, &i, file);
         if(res == -1) return NULL;
     }
+    if((*peers)[i].status == OFFLINE && msg_type != BYE) {
+        (*peers)[i].status = ONLINE;
+        printf("\tAtualizando peer %s:%d status %s\n", inet_ntoa((*peers)[i].con.sin_addr), ntohs((*peers)[i].con.sin_port), status_string[1]);
+        (*peers)[i].p_clock = max((*peers)[i].p_clock, sender.p_clock);
+    }
     switch(msg_type) {
-    case HELLO:
-        if((*peers)[i].status == OFFLINE) {
-            (*peers)[i].status = ONLINE;
-            printf("\tAtualizando peer %s:%d status %s\n", inet_ntoa((*peers)[i].con.sin_addr), ntohs((*peers)[i].con.sin_port), status_string[1]);
-        }
-        break;
     case GET_PEERS:
-        if((*peers)[i].status == OFFLINE) {
-            (*peers)[i].status = ONLINE;
-            printf("\tAtualizando peer %s:%d status %s\n", inet_ntoa((*peers)[i].con.sin_addr), ntohs((*peers)[i].con.sin_port), status_string[1]);
-        }
-        share_peers_list(server, clock, &clock_lock, &(*peers)[i], *peers, *peers_size);
+        share_peers_list(server, clock, &clock_lock, n_sock, &(*peers)[i], *peers, *peers_size);
         break;
-    case PEER_LIST:
-        if((*peers)[i].status == OFFLINE) {
-            (*peers)[i].status = ONLINE;
-            printf("\tAtualizando peer %s:%d status %s\n", inet_ntoa((*peers)[i].con.sin_addr), ntohs((*peers)[i].con.sin_port), status_string[1]);
-        }
-        append_list_peers(buf, peers, peers_size, rec_peers_size, file);
+    case LS:
+        //TODO: LS_func();
+        break;
+    case DL:
+        //TODO: DL_func();
         break;
     case BYE:
         if((*peers)[i].status == ONLINE) {
@@ -86,7 +92,6 @@ void *treat_request(void *args) {
         }
         break;
     default:
-        printf("\tTipo de mensagem nao reconhecido\n");
         break;
     }
     if(msg_type != PEER_LIST) printf(">");
@@ -123,10 +128,6 @@ void *listen_socket(void *args) {
         return NULL;
     }
     while(!should_quit) {
-        // TODO: - verificar se ip dele bate com mensagem;
-        //       - procurar ele na lista;
-        //       - criar ele como peer;
-        // accept() não leva o endereço do server, e sim o endereço que o cliente se conectando tem!
         SOCKET n_sock = accept(server_soc, (struct sockaddr *)&(client.con), &addrlen);
         if(is_invalid_sock(n_sock) && !should_quit) {
             fprintf(stderr, "\nErro: Falha aceitando socket de conexao\n");
@@ -173,7 +174,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    create_address(&server, argv[1]);
+    create_address(&server, argv[1], 0);
 
     // read file to get neighbours
     FILE *f = fopen(argv[2], "r");
@@ -221,13 +222,13 @@ int main(int argc, char **argv)
             show_peers(server, &loc_clock, &clock_lock, *peers, *peers_size);
             break;
         case 2:
-            get_peers(server, &loc_clock, &clock_lock, *peers, *peers_size);
+            get_peers(server, &loc_clock, &clock_lock, peers, peers_size, argv[2]);
             break;
         case 3:
             show_files(files, files_len);
             break;
         case 4:
-            //get_files();
+            //get_files(); //FIXME:|TODO: Manter conexao
             break;
         case 5:
             // show_statistics();

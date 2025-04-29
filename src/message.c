@@ -40,7 +40,8 @@ void show_peers(peer server, int *clock, pthread_mutex_t *clock_lock, peer *peer
             fprintf(stderr, "Erro: Falha na construcao da mensagem!\n");
             return;
         }
-        send_message(msg, &(peers[input - 1]), HELLO);
+        SOCKET s = send_message(msg, &(peers[input - 1]), HELLO);
+        sock_close(s);
         free(msg);
     }
     else {
@@ -50,25 +51,48 @@ void show_peers(peer server, int *clock, pthread_mutex_t *clock_lock, peer *peer
 }
 
 // request the peers list of every known peer
-void get_peers(peer server, int *clock, pthread_mutex_t *clock_lock, peer *peers, size_t peers_size) {
+void get_peers(peer server, int *clock, pthread_mutex_t *clock_lock, peer **peers, size_t *peers_size, char *file) {
     char *msg = build_message(server.con, *clock, GET_PEERS, NULL);
     if(!msg) {
         perror("Erro: Falha na construcao da mensagem!\n");
         return;
     }
-    for(int i = 0; i < peers_size; i++) {
+    size_t loop_len = *peers_size;
+    for(int i = 0; i < loop_len; i++) {
         pthread_mutex_lock(clock_lock);
         (*clock)++;
         pthread_mutex_unlock(clock_lock);
         printf("\t=> Atualizando relogio para %d\n", *clock);
-        send_message(msg, &peers[i], GET_PEERS);
-        mssleep(500);
+        SOCKET req = send_message(msg, &((*peers)[i]), GET_PEERS);
+        if(is_invalid_sock(req)) continue;
+        char *buf = malloc(sizeof(char) * MSG_SIZE);
+        ssize_t valread = recv(req, buf, MSG_SIZE - 1, 0);
+        if(valread <= 0) {
+            fprintf(stderr, "\nErro: Falha lendo mensagem\n");
+            continue;
+        }
+        peer sender;
+        MSG_TYPE msg_type = read_message(buf, &sender);
+
+        int *rec_peers_size = malloc(sizeof(int));
+        char *temp = check_msg_full(buf, req, msg_type, (void *)rec_peers_size, &valread);
+        if(temp) {
+            free(buf);
+            buf = temp;
+        }
+
+        buf[valread] = '\0';
+
+        printf("\n");
+        printf("\tResposta recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
+        append_list_peers(buf, peers, peers_size, *rec_peers_size, file);
+        sock_close(req);
     }
     free(msg);
 }
 
 // share the peers list with who requested
-void share_peers_list(peer server, int *clock, pthread_mutex_t *clock_lock, peer *sender, peer *peers, size_t peers_size) {
+void share_peers_list(peer server, int *clock, pthread_mutex_t *clock_lock, SOCKET soc, peer *sender, peer *peers, size_t peers_size) {
     peer_list_args args;
     args.sender = *sender;
     args.peers = peers;
@@ -78,7 +102,9 @@ void share_peers_list(peer server, int *clock, pthread_mutex_t *clock_lock, peer
     (*clock)++;
     pthread_mutex_unlock(clock_lock);
     printf("\t=> Atualizando relogio para %d\n", *clock);
-    send_message(msg, sender, PEER_LIST);
+    printf("\tEncaminhando mensagem \"%.*s\" para %s:%d\n", (int)strcspn(msg, "\n"), msg, inet_ntoa(sender->con.sin_addr), ntohs(sender->con.sin_port));
+    send(soc, msg, strlen(msg) + 1, 0);
+    sock_close(soc);
     free(msg);
 }
 
@@ -114,14 +140,12 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
             return NULL;
         }
         msg = temp;
-        int argumento_sem_nome_ainda = 0;
         sprintf(msg, "%s:%d %d PEER_LIST %d", ip, (int)ntohs(sender_ip.sin_port), clock, (int)peers_size - 1);
         for(int i = 0; i < peers_size; i++) {
             if(is_same_peer(sender, peers[i]))
                 continue;
             sprintf(msg, "%s ", msg);
-            if(peers[i].status == ONLINE) sprintf(msg, "%s%s:%d:%s:%d", msg, inet_ntoa(peers[i].con.sin_addr), ntohs(peers[i].con.sin_port), status_string[1], argumento_sem_nome_ainda);
-            else sprintf(msg, "%s%s:%d:%s:%d", msg, inet_ntoa(peers[i].con.sin_addr), ntohs(peers[i].con.sin_port), status_string[0], argumento_sem_nome_ainda);
+            sprintf(msg, "%s%s:%d:%s:%d", msg, inet_ntoa(peers[i].con.sin_addr), ntohs(peers[i].con.sin_port), status_string[peers[i].status], peers[i].p_clock);
         }
         sprintf(msg, "%s\n", msg);
         break;
@@ -136,73 +160,52 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
 }
 
 // send a built message to an known peer socket
-void send_message(const char *msg, peer *neighbour, MSG_TYPE msg_type) {
+SOCKET send_message(const char *msg, peer *neighbour, MSG_TYPE msg_type) {
     if(!msg) {
         fprintf(stderr, "\nErro: Mensagem de envio vazia!\n");
-        return;
+        return INVALID_SOCKET;
     }
     SOCKET server_soc = socket(AF_INET, SOCK_STREAM, 0);
     if(is_invalid_sock(server_soc)) {
         fprintf(stderr, "\nErro: Falha na criacao do socket");
         show_soc_error();
-        return;
+        return INVALID_SOCKET;
     }
     if(connect(server_soc, (const struct sockaddr *)&(neighbour->con), sizeof(neighbour->con)) != 0) {
         fprintf(stderr, "\nErro: Falha ao conectar ao peer\n");
         show_soc_error();
         sock_close(server_soc);
-        return;
+        return INVALID_SOCKET;
     }
     size_t len = strlen(msg);
     printf("\tEncaminhando mensagem \"%.*s\" para %s:%d\n", (int)strcspn(msg, "\n"), msg, inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port));
     if(send(server_soc, msg, len + 1, 0) == len + 1) {
-        switch(msg_type) {
-        case HELLO:
-            if(neighbour->status == OFFLINE) {
-                neighbour->status = ONLINE;
-                printf("\tAtualizando peer %s:%d status %s\n", inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port), status_string[1]);
-            }
-            break;
-        case GET_PEERS:
-            break;
-        default:
-            break;
+        if(neighbour->status == OFFLINE) {
+            neighbour->status = ONLINE;
+            printf("\tAtualizando peer %s:%d status %s\n", inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port), status_string[1]);
         }
     }
     else {
-        switch(msg_type) {
-        case HELLO:
-            if(neighbour->status == ONLINE) {
-                neighbour->status = OFFLINE;
-                printf("\tAtualizando peer %s:%d status %s\n", inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port), status_string[0]);
-            }
-            break;
-        case GET_PEERS:
-            if(neighbour->status == ONLINE) {
-                neighbour->status = OFFLINE;
-                printf("\tAtualizando peer %s:%d status %s\n", inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port), status_string[0]);
-            }
-            break;
-        default:
-            break;
+        if(neighbour->status == ONLINE) {
+            neighbour->status = OFFLINE;
+            printf("\tAtualizando peer %s:%d status %s\n", inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port), status_string[0]);
         }
         show_soc_error();
     }
-    sock_close(server_soc);
+    return server_soc;
 }
 
 // read message, mark its sender and return the message type
-MSG_TYPE read_message(const char *buf, int *clock, peer *sender) {
+MSG_TYPE read_message(const char *buf, peer *sender) {
     char *buf_cpy = strdup(buf);
     char *tok_ip = strtok(buf_cpy, " ");
     int aclock = atoi(strtok(NULL, " "));
     char *tok_msg = strtok(NULL, " ");
-    aclock = aclock; // FIXME: melhor jeito de tirar mensagem de variável inútil
 
     if(tok_msg) {
         tok_msg[strcspn(tok_msg, "\n")] = '\0';
     }
-    create_address(sender, tok_ip);
+    create_address(sender, tok_ip, aclock);
     if(strcmp(tok_msg, "HELLO") == 0) {
         free(buf_cpy);
         return HELLO;
@@ -215,6 +218,22 @@ MSG_TYPE read_message(const char *buf, int *clock, peer *sender) {
         free(buf_cpy);
         return PEER_LIST;
     }
+    if(strcmp(tok_msg, "LS") == 0) {
+        free(buf_cpy);
+        return LS;
+    }
+    if(strcmp(tok_msg, "LS_LIST") == 0) {
+        free(buf_cpy);
+        return LS_LIST;
+    }
+    if(strcmp(tok_msg, "DL") == 0) {
+        free(buf_cpy);
+        return DL;
+    }
+    if(strcmp(tok_msg, "FILE") == 0) {
+        free(buf_cpy);
+        return FILEMSG;
+    }
     if(strcmp(tok_msg, "BYE") == 0) {
         free(buf_cpy);
         return BYE;
@@ -223,7 +242,7 @@ MSG_TYPE read_message(const char *buf, int *clock, peer *sender) {
 }
 
 // check if message received was read fully
-char *check_msg_full(const char *buf, SOCKET sock, int *rec_peers_size, ssize_t *valread) {
+char *check_msg_full(const char *buf, SOCKET sock, MSG_TYPE msg_type, void *args, ssize_t *valread) { //TODO: Ajeitar funcao para aceitar tipos de mensagens novos 
     bool is_full_msg = false;
     if(*valread == MSG_SIZE - 1) {
         for(int i = 0; i < *valread; i++) {
@@ -233,27 +252,41 @@ char *check_msg_full(const char *buf, SOCKET sock, int *rec_peers_size, ssize_t 
             }
         }
         if(!is_full_msg) {
-            int spaces = 0;
-            char *duplicate;
-            for(int i = 0; i < *valread; i++) {
-                if(buf[i] == ' ') {
-                    spaces++;
-                    if(spaces == 3) {
-                        duplicate = strdup(&buf[i + 1]);
-                    }
-                    if(spaces == 4 && duplicate) {
-                        duplicate[strcspn(duplicate, " ")] = '\0';
-                        *rec_peers_size = atoi(duplicate);
-                        free(duplicate);
-                        int new_size = alt_msg_size(*rec_peers_size);
-                        char *aux_buf;
-                        aux_buf = malloc(sizeof(char) * new_size);
-                        if(!aux_buf) return NULL;
-                        sprintf(aux_buf, "%s", buf);
-                        *valread += recv(sock, &aux_buf[*valread], new_size, 0);
-                        return aux_buf;
+            switch(msg_type) {
+            case PEER_LIST: //int ip:port:status:clock xint
+                ;
+                int spaces = 0;
+                char *duplicate;
+                int *rec_peers_size = (int *)args;
+                for(int i = 0; i < *valread; i++) {
+                    if(buf[i] == ' ') {
+                        spaces++;
+                        if(spaces == 3) {
+                            duplicate = strdup(&buf[i + 1]);
+                        }
+                        if(spaces == 4 && duplicate) {
+                            duplicate[strcspn(duplicate, " ")] = '\0';
+                            *rec_peers_size = atoi(duplicate);
+                            free(duplicate);
+                            int new_size = alt_msg_size(*rec_peers_size);
+                            char *aux_buf;
+                            aux_buf = malloc(sizeof(char) * new_size);
+                            if(!aux_buf) return NULL;
+                            sprintf(aux_buf, "%s", buf);
+                            *valread += recv(sock, &aux_buf[*valread], new_size, 0);
+                            return aux_buf;
+                        }
                     }
                 }
+                break;
+            case LS_LIST: //int name:size(int) xint
+                break;
+            case DL: //name int int
+                break;
+            case FILEMSG: //name int int base64content(size known after LS_LIST)
+                break;
+            default:
+                break;
             }
         }
     }
@@ -261,6 +294,7 @@ char *check_msg_full(const char *buf, SOCKET sock, int *rec_peers_size, ssize_t 
 }
 
 // append received list to known peer list
+//FIXME: pass this to peer.c
 void append_list_peers(const char *buf, peer **peers, size_t *peers_size, size_t rec_peers_size, char *file) {
     char *cpy = strdup(buf);
     strtok(cpy, " "); //ip
@@ -276,6 +310,7 @@ void append_list_peers(const char *buf, peer **peers, size_t *peers_size, size_t
     }
 
     char *p = NULL;
+    printf("%d\n", rec_peers_size);
     peer *rec_peers_list = malloc(sizeof(peer) * rec_peers_size);
 
     if(!rec_peers_list) {
@@ -298,7 +333,7 @@ void append_list_peers(const char *buf, peer **peers, size_t *peers_size, size_t
                 if(strcmp(infon, "ONLINE") == 0) rec_peers_list[i].status = ONLINE;
                 else rec_peers_list[i].status = OFFLINE;
             }
-            if(j == 3); // FIXME: numero aleatorio jogado fora por enquanto;
+            if(j == 3) rec_peers_list[i].p_clock = atoi(infon);
             infon = strtok(NULL, ":");
         }
 
@@ -328,7 +363,8 @@ void bye_peers(peer server, int *clock, peer *peers, size_t peers_size) {
     for(int i = 0; i < peers_size; i++) {
         if(peers[i].status == ONLINE) {
             char *msg = build_message(server.con, *clock, BYE, NULL);
-            send_message(msg, &peers[i], BYE);
+            SOCKET s = send_message(msg, &peers[i], BYE);
+            sock_close(s);
             free(msg);
         }
     }

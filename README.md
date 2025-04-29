@@ -26,5 +26,30 @@ Também é possível usar o python para produzir um campo de testes com múltipl
 python testing.py
 ```
 
-## TODO:
+This product includes software developed by the Apache Group for use in the Apache HTTP server project (http://www.apache.org/).
 
+## TODO:
+Requisitos EP2
+{
+    LS 
+    {
+        Mensagem a cada peer
+        Lista de arquivos
+        Display da lista bonitinho
+    }
+    LS_LIST
+    {
+        <int> <nome>:<tamanho>
+    }
+    DL
+    {
+        <nome> <int> <int>
+    }
+    FILE 
+    {
+        <nome> <int> <int> <string_base64>
+    }
+}
+Manter conexão para mensagens persistentes (requisição de peers, envio de arquivo)
+Cheque teste do prof (obter peers -> listar peers erro)
+Conserto alt_msg_size

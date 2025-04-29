@@ -15,7 +15,7 @@ bool is_same_peer(peer a, peer b) {
 }
 
 // create an IPv4 sockaddr_in
-void create_address(peer *address, const char *ip) {
+void create_address(peer *address, const char *ip, uint32_t clock) {
     char *ip_cpy = strdup(ip);
     char *tokip = strtok(ip_cpy, ":");
     char *tokport = strtok(NULL, ":");
@@ -23,6 +23,7 @@ void create_address(peer *address, const char *ip) {
     address->con.sin_family = AF_INET;
     address->con.sin_port = htons((unsigned short)(atoi(tokport))); // make string into int, then the int into short, then the short into a network byte order short
     address->status = OFFLINE;
+    address->p_clock = clock;
     free(ip_cpy);
 }
 
@@ -55,7 +56,7 @@ peer *create_peers(const char **peers_ip, size_t peers_size) {
     }
     for(int i = 0; i < peers_size; i++) {
         printf("Adicionando novo peer %s status %s\n", peers_ip[i], status_string[0]);
-        create_address(&peers[i], peers_ip[i]);
+        create_address(&peers[i], peers_ip[i], 0);
     }
     return peers;
 }

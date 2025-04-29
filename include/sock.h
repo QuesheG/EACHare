@@ -18,8 +18,8 @@
 #include <errno.h>
 #define SOCKET int
 #define is_invalid_sock(x) (x < 0)
+#define INVALID_SOCKET -1
 #endif
-
 
 #ifdef WIN
 int init_win_sock(void);
