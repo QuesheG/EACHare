@@ -19,7 +19,9 @@
         "peer.h": "c",
         "pthread.h": "c",
         "stdbool.h": "c",
-        "threading.h": "c"
+        "threading.h": "c",
+        "math.h": "c",
+        "string.h": "c"
     },
     "C_Cpp.formatting": "vcFormat",
     "C_Cpp.vcFormat.space.beforeBlockOpenBrace": true,

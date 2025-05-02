@@ -18,11 +18,10 @@ void *treat_request(void *args) {
     peer server;
     peer **peers;
     size_t *peers_size;
-    int *clock;
     char *file;
-    DIR *dir;
     SOCKET n_sock;
-    get_args((listen_args *)args, &server, &peers, &peers_size, &clock, &file, &dir, &n_sock);
+    char *dir_path;
+    get_args((listen_args *)args, &server, &peers, &peers_size, &file, &n_sock, &dir_path);
 
     char *buf = malloc(sizeof(char) * MSG_SIZE);
 
@@ -37,9 +36,6 @@ void *treat_request(void *args) {
     MSG_TYPE msg_type = read_message(buf, &sender);
     char arg = 0;
     switch(msg_type) {
-        case LS:
-            //TODO: alocar arg baseado no tipo da mensagem
-            break;
         case DL:
             //TODO: alocar arg baseado no tipo da mensagem
             break;
@@ -55,15 +51,15 @@ void *treat_request(void *args) {
     buf[valread] = '\0';
 
     pthread_mutex_lock(&clock_lock);
-    *clock = max(*clock, sender.p_clock);
+    server.p_clock = max(server.p_clock, sender.p_clock);
     pthread_mutex_unlock(&clock_lock);
     
     printf("\n");
     printf("\tMensagem recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
     pthread_mutex_lock(&clock_lock);
-    (*clock)++;
+    server.p_clock++;
     pthread_mutex_unlock(&clock_lock);
-    printf("\t=> Atualizando relogio para %d\n", *clock);
+    printf("\t=> Atualizando relogio para %d\n", server.p_clock);
     int i = peer_in_list(sender, *peers, *peers_size);
     if(i < 0) {
         sender.status = ONLINE;
@@ -77,13 +73,13 @@ void *treat_request(void *args) {
     }
     switch(msg_type) {
     case GET_PEERS:
-        share_peers_list(server, clock, &clock_lock, n_sock, &(*peers)[i], *peers, *peers_size);
+        share_peers_list(&server, &clock_lock, n_sock, &(*peers)[i], *peers, *peers_size);
         break;
     case LS:
-        //TODO: LS_func();
+        share_files_list(&server, &clock_lock, n_sock, dir_path);
         break;
     case DL:
-        //TODO: DL_func();
+        send_file(&server, &clock_lock, n_sock, dir_path, arg);
         break;
     case BYE:
         if((*peers)[i].status == ONLINE) {
@@ -106,11 +102,10 @@ void *listen_socket(void *args) {
     peer server;
     peer **peers;
     size_t *peers_size;
-    int *clock;
     char *file;
-    DIR *dir;
     SOCKET a;
-    get_args((listen_args *)args, &server, &peers, &peers_size, &clock, &file, &dir, &a);
+    char *dir_path;
+    get_args((listen_args *)args, &server, &peers, &peers_size, &file, &a, &dir_path);
 
     peer client;
     socklen_t addrlen = sizeof(server.con);
@@ -135,7 +130,7 @@ void *listen_socket(void *args) {
         if(should_quit) return NULL;
 
         pthread_t response_thread;
-        listen_args *l_args = send_args(server, peers, peers_size, clock, file, dir, n_sock);
+        listen_args *l_args = send_args(server, peers, peers_size, file, n_sock, dir_path);
         pthread_create(&response_thread, NULL, treat_request, (void *)l_args);
     }
     sock_close(server_soc);
@@ -164,9 +159,9 @@ int main(int argc, char **argv)
 
     peer server;
     peer **peers = malloc(sizeof(peer *));
-    int loc_clock = 0, comm;
+    int comm;
     size_t *peers_size = malloc(sizeof(size_t)), files_len = 0;
-    char **peers_txt, **files;
+    char **peers_txt, ***files;
     pthread_t listener_thread;
 
     if(!peers || !peers_size) {
@@ -198,8 +193,9 @@ int main(int argc, char **argv)
         return 1;
     }
     files = get_dir_files(shared_dir, &files_len);
-
-    listen_args *args = send_args(server, peers, peers_size, &loc_clock, argv[2], shared_dir, 0);
+    closedir(shared_dir);
+    
+    listen_args *args = send_args(server, peers, peers_size, argv[2], 0, argv[3]);
     pthread_create(&listener_thread, NULL, listen_socket, (void *)args);
 
     while(!should_quit) {
@@ -219,16 +215,16 @@ int main(int argc, char **argv)
         }
         switch(comm) {
         case 1:
-            show_peers(server, &loc_clock, &clock_lock, *peers, *peers_size);
+            show_peers(&server, &clock_lock, *peers, *peers_size);
             break;
         case 2:
-            get_peers(server, &loc_clock, &clock_lock, peers, peers_size, argv[2]);
+            get_peers(&server, &clock_lock, peers, peers_size, argv[2]);
             break;
         case 3:
             show_files(files, files_len);
             break;
         case 4:
-            //get_files(); //FIXME:|TODO: Manter conexao
+            get_files(&server, &clock_lock, *peers, *peers_size, shared_dir, &files, &files_len);
             break;
         case 5:
             // show_statistics();
@@ -247,13 +243,12 @@ int main(int argc, char **argv)
     }
 
     pthread_mutex_destroy(&clock_lock);
-    bye_peers(server, &loc_clock, *peers, *peers_size);
+    bye_peers(server, *peers, *peers_size);
     free(*peers);
     free(peers);
     free(peers_size);
     free(args);
     free(files);
-    closedir(shared_dir);
 #ifdef WIN
     WSACleanup();
 #endif

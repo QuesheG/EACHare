@@ -31,7 +31,7 @@ This product includes software developed by the Apache Group for use in the Apac
 ## TODO:
 Requisitos EP2
 {
-    LS 
+    LS //ESCRITO, FALTA TESTE
     {
         Mensagem a cada peer
         Lista de arquivos
@@ -41,7 +41,7 @@ Requisitos EP2
     {
         <int> <nome>:<tamanho>
     }
-    DL
+    DL //ESCRITO, FALTA TESTE
     {
         <nome> <int> <int>
     }
@@ -50,6 +50,4 @@ Requisitos EP2
         <nome> <int> <int> <string_base64>
     }
 }
-Manter conexão para mensagens persistentes (requisição de peers, envio de arquivo)
 Cheque teste do prof (obter peers -> listar peers erro)
-Conserto alt_msg_size

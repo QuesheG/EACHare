@@ -79,3 +79,21 @@ void show_files(char **files, size_t file_len) {
         printf("  %s\n", files[i]);
     }
 }
+
+char *dir_file_path(char *dir_path, char *file_name) {
+    size_t d_path_size = strlen(dir_path);
+    char *file_path = malloc(sizeof(char) * (strlen(file_name) + d_path_size));
+    strncpy(file_path, dir_path, d_path_size);
+    file_path[d_path_size] = "/";
+    strncpy(file_path + d_path_size, file_name, strlen(file_name));
+    return file_path;
+}
+
+int fsize(char *file) {
+    FILE *fp = fopen(file, "r");
+    int prev=ftell(fp);
+    fseek(fp, 0L, SEEK_END);
+    int sz=ftell(fp);
+    fseek(fp,prev,SEEK_SET); //go back to where we were
+    return sz;
+}

@@ -1,5 +1,5 @@
-#ifndef SOCK_H
-#define SOCK_H
+#ifndef _SOCK_H
+#define _SOCK_H
 #ifdef _WIN32
 #ifndef _WIN32_WINNT
 #define _WIN32_WINNT 0x0600
@@ -26,6 +26,6 @@ int init_win_sock(void);
 #endif
 
 void sock_close(SOCKET sock); // standard function for socket creation
-void show_soc_error();        // standard function for socket error messages
+void show_soc_error(); // standard function for socket error messages
 
 #endif
