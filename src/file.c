@@ -45,7 +45,12 @@ char **read_peers(FILE *f, size_t *len) {
 }
 
 //store name of every file in directory
-char **get_dir_files(DIR *dir, size_t *len) {
+char **get_dir_files(const char *dir_path, size_t *len) {
+    DIR *dir = opendir(dir_path);
+    if(!dir) {
+        perror("Erro: Diretorio nao achado, cheque escrita ou existencia do diretorio");
+        return NULL;
+    }
     char **files = NULL;
     *len = 0;
     while(true) {
@@ -66,11 +71,12 @@ char **get_dir_files(DIR *dir, size_t *len) {
         strncpy(files[*len], dir_ent->d_name, d_len);
         *len += 1;
     }
+    closedir(dir);
     return files;
 }
 
 //list filenames in memory
-void show_files(char **files, size_t file_len) {
+void show_files(const char **files, size_t file_len) {
     if(file_len <= 0) {
         printf("Nao foi possivel encontrar arquivos\n");
         return;
@@ -80,7 +86,7 @@ void show_files(char **files, size_t file_len) {
     }
 }
 
-char *dir_file_path(char *dir_path, char *file_name) {
+char *dir_file_path(const char *dir_path, const char *file_name) {
     size_t d_path_size = strlen(dir_path);
     char *file_path = malloc(sizeof(char) * (strlen(file_name) + d_path_size));
     strncpy(file_path, dir_path, d_path_size);
@@ -89,7 +95,7 @@ char *dir_file_path(char *dir_path, char *file_name) {
     return file_path;
 }
 
-int fsize(char *file) {
+int fsize(const char *file) {
     FILE *fp = fopen(file, "r");
     int prev=ftell(fp);
     fseek(fp, 0L, SEEK_END);

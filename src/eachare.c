@@ -34,15 +34,7 @@ void *treat_request(void *args) {
 
     peer sender;
     MSG_TYPE msg_type = read_message(buf, &sender);
-    char arg = 0;
-    switch(msg_type) {
-        case DL:
-            //TODO: alocar arg baseado no tipo da mensagem
-            break;
-        default:
-            break;
-    }
-    char *temp = check_msg_full(buf, n_sock, msg_type, (void *)&arg, &valread);
+    char *temp = check_msg_full(buf, n_sock, msg_type, NULL, &valread);
     if(temp) {
         free(buf);
         buf = temp;
@@ -79,7 +71,7 @@ void *treat_request(void *args) {
         share_files_list(&server, &clock_lock, n_sock, dir_path);
         break;
     case DL:
-        send_file(&server, &clock_lock, n_sock, dir_path, arg);
+        send_file(&server, &clock_lock, buf, n_sock, dir_path);
         break;
     case BYE:
         if((*peers)[i].status == ONLINE) {
@@ -187,13 +179,7 @@ int main(int argc, char **argv)
     free(peers_txt);
 
     // read directory
-    DIR *shared_dir = opendir(argv[3]);
-    if(!shared_dir) {
-        perror("Erro: Diretorio nao achado, cheque escrita ou existencia do diretorio");
-        return 1;
-    }
-    files = get_dir_files(shared_dir, &files_len);
-    closedir(shared_dir);
+    files = get_dir_files(argv[3], &files_len);
     
     listen_args *args = send_args(server, peers, peers_size, argv[2], 0, argv[3]);
     pthread_create(&listener_thread, NULL, listen_socket, (void *)args);
@@ -224,7 +210,7 @@ int main(int argc, char **argv)
             show_files(files, files_len);
             break;
         case 4:
-            get_files(&server, &clock_lock, *peers, *peers_size, shared_dir, &files, &files_len);
+            get_files(&server, &clock_lock, *peers, *peers_size, argv[3], &files, &files_len);
             break;
         case 5:
             // show_statistics();

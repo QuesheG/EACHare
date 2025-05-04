@@ -29,25 +29,5 @@ python testing.py
 This product includes software developed by the Apache Group for use in the Apache HTTP server project (http://www.apache.org/).
 
 ## TODO:
-Requisitos EP2
-{
-    LS //ESCRITO, FALTA TESTE
-    {
-        Mensagem a cada peer
-        Lista de arquivos
-        Display da lista bonitinho
-    }
-    LS_LIST
-    {
-        <int> <nome>:<tamanho>
-    }
-    DL //ESCRITO, FALTA TESTE
-    {
-        <nome> <int> <int>
-    }
-    FILE 
-    {
-        <nome> <int> <int> <string_base64>
-    }
-}
+Testes
 Cheque teste do prof (obter peers -> listar peers erro)
