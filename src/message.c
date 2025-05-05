@@ -9,7 +9,7 @@
 #include <threading.h>
 #include <base64.h>
 
-char *message_string[] = { "HELLO", "GET_PEERS", "PEER_LIST", "LS", "LS_LIST", "DL", "FILE", "BYE"};
+char *message_string[] = { "UNEXPECTED_MSG_TYPE", "HELLO", "GET_PEERS", "PEER_LIST", "LS", "LS_LIST", "DL", "FILE", "BYE"};
 
 // print the peers in list
 void show_peers(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t peers_size) {
@@ -110,6 +110,7 @@ void share_peers_list(peer *server, pthread_mutex_t *clock_lock, SOCKET soc, pee
     args.peers = peers;
     args.peers_size = peers_size;
     char *msg = build_message(server->con, server->p_clock, PEER_LIST, (void *)&args);
+    printf("%s %d", msg, ntohs(sender->con.sin_port));
     pthread_mutex_lock(clock_lock);
     server->p_clock++;
     pthread_mutex_unlock(clock_lock);
@@ -181,14 +182,11 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
     }
     uint16_t max_fname_size = 10;
     uint16_t max_fsize_size = 7;
-    uint16_t max_peer_size = 14;
     for(int i = 0; i < files_list_len; i++) {
         uint16_t s_f = strlen(files[i].file.fname);
         uint16_t s_s = strlen(files[i].file.fname);
-        uint16_t s_p = strlen(inet_ntoa(files[i].holder.con.sin_addr)) + floor(log10((double)ntohs(files[i].holder.con.sin_port))) + 2;
         if(s_f > max_fname_size) max_fname_size = s_f;
         if(s_s > max_fname_size) max_fsize_size = s_s;
-        if(s_p > max_fname_size) max_peer_size = s_p;
     }
     uint16_t count_size = floor(log10(files_list_len)) + 1;
     //print header
@@ -210,7 +208,7 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
         printf("[%0*d] ", count_size, i + 1);
         printf("%-*s", max_fname_size, files[i].file.fname);
         printf("%-*d", max_fname_size, files[i].file.fsize);
-        printf("%s\n", files[i].holder);
+        printf("%s\n", inet_ntoa(files[i].holder.con.sin_addr));
     }
     printf("Digite o numero do arquivo para fazer o download:\n");
     int f_to_down = 0;
@@ -335,7 +333,7 @@ void send_file(peer *server, pthread_mutex_t *clock_lock, char *buf, SOCKET con,
 // create a message with the sender ip, its clock and the message type
 char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *args) {
     char *ip = inet_ntoa(sender_ip.sin_addr);
-    u_long port = ntohl(sender_ip.sin_port);
+    u_short port = ntohs(sender_ip.sin_port);
     char *msg = malloc(sizeof(char) * MSG_SIZE);
 
     if(!msg) {
@@ -364,7 +362,7 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
             return NULL;
         }
         msg = temp;
-        sprintf(msg, "%s:%lu %d PEER_LIST %d", ip, port, clock, (int)peers_size - 1);
+        sprintf(msg, "%s:%u %d PEER_LIST %d", ip, port, clock, (int)peers_size - 1);
         for(int i = 0; i < peers_size; i++) {
             if(is_same_peer(sender, peers[i]))
                 continue;
@@ -381,7 +379,7 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
             return NULL;
         }
         msg = temp;
-        sprintf(msg, "%s:%lu %d LS_LIST %d", ip, port, clock, (int)llargs->list_len);
+        sprintf(msg, "%s:%u %d LS_LIST %d", ip, port, clock, (int)llargs->list_len);
         for(int i = 0; i < llargs->list_len; i++) {
             sprintf(msg, "%s %s:%d", msg, llargs->list[i], llargs->list_file_len[i]);
         }
@@ -396,7 +394,7 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
             return NULL;
         }
         msg = temp;
-        sprintf(msg, "%s:%lu %d DL %s %d %d\n", ip, port, clock, dargs->fname, dargs->a, dargs->b);
+        sprintf(msg, "%s:%u %d DL %s %d %d\n", ip, port, clock, dargs->fname, dargs->a, dargs->b);
         break;
     case FILEMSG:
         ;
@@ -407,10 +405,10 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
             return NULL;
         }
         msg = temp;
-        sprintf(msg, "%s:%lu %d FILE %s %d %d %s\n", ip, port, clock, fargs->file_name, fargs->a, fargs->b, fargs->contentb64);
+        sprintf(msg, "%s:%u %d FILE %s %d %d %s\n", ip, port, clock, fargs->file_name, fargs->a, fargs->b, fargs->contentb64);
         break;
     default:
-        sprintf(msg, "%s:%lu %d %s\n", ip, port, clock, message_string[msg_type]);
+        sprintf(msg, "%s:%u %d %s\n", ip, port, clock, message_string[msg_type]);
         break;
     }
     return msg;
@@ -562,7 +560,7 @@ char *check_msg_full(const char *buf, SOCKET sock, MSG_TYPE msg_type, void *args
 
 
 //append list received to known list
-void append_file_list(const char *buf, ls_files *list, size_t list_len, peer sender, size_t rec_files_len) {
+void append_files_list(const char *buf, ls_files *list, size_t list_len, peer sender, size_t rec_files_len) {
     char *cpy = strdup(buf);
     strtok(cpy, " "); //ip
     strtok(NULL, " ");//clock

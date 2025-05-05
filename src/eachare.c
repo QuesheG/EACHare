@@ -189,7 +189,7 @@ int main(int argc, char **argv)
             "\t[1] Listar peers\n"
             "\t[2] Obter peers\n"
             "\t[3] Listar arquivos locais\n"
-            "\t[4] Buscar arquivos -> WIP\n"
+            "\t[4] Buscar arquivos\n"
             "\t[5] Exibir estatisticas -> WIP\n"
             "\t[6] Alterar tamanho da chunk -> WIP\n"
             "\t[9] Sair\n");
@@ -207,7 +207,7 @@ int main(int argc, char **argv)
             get_peers(&server, &clock_lock, peers, peers_size, argv[2]);
             break;
         case 3:
-            show_files(files, files_len);
+            show_files((const char **)files, files_len);
             break;
         case 4:
             get_files(&server, &clock_lock, *peers, *peers_size, argv[3], files, &files_len);
