@@ -162,12 +162,14 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
 
         buf[valread] = '\0';
 
-        ls_files *temp = realloc(files, sizeof(ls_files) * (files_list_len + *rec_files_size));
-        if(!temp) {
-            free(temp);
+        ls_files *temp1 = realloc(files, sizeof(ls_files) * (files_list_len + *rec_files_size));
+        if(!temp1) {
+            free(temp1);
+            free(rec_files_size);
+            free(buf);
             continue;
         }
-        files = temp;
+        files = temp1;
         files_list_len += *rec_files_size;
 
         printf("\n");
@@ -195,7 +197,7 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
     printf("|");
     printf(" %-*s ", max_fsize_size, "Tamanho");
     printf("|");
-    printf(" %s\n", max_peer_size, "Peer");
+    printf(" %s\n", "Peer");
     //print cancel
     printf("[%0*d] ", count_size, 0);
     printf("%-*s ", max_fname_size, "<Cancelar>");
@@ -208,7 +210,7 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
         printf("[%0*d] ", count_size, i + 1);
         printf("%-*s", max_fname_size, files[i].file.fname);
         printf("%-*d", max_fname_size, files[i].file.fsize);
-        printf("%s\n", max_peer_size, files[i].holder);
+        printf("%s\n", files[i].holder);
     }
     printf("Digite o numero do arquivo para fazer o download:\n");
     int f_to_down = 0;
@@ -220,8 +222,9 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
     }
     if(!f_to_down) return;
     if(f_to_down > files_list_len) return;
+    f_to_down--;
     dl_msg_args *args = malloc(sizeof(dl_msg_args));
-    args->fname = files[f_to_down - 1].file.fname;
+    args->fname = files[f_to_down].file.fname;
     args->a = 0;
     args->b = 0;
     char *msg = build_message(server->con, server->p_clock, DL, (void *)args);
@@ -267,7 +270,7 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
     }
     files_list = temp;
     files_list[*files_len] = strdup(files[f_to_down].file.fname);
-    *files_len++;
+    (*files_len)++;
     free(files);
     free(file_b64);
     free(file_decoded);
@@ -344,6 +347,7 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
         msg = NULL;
         return msg;
     }
+    char *temp;
     switch(msg_type) {
         /*
         MESSAGE FORMATING: <sender_ip>:<sender_port> <sender_clock> <MSG_TYPE> [<ARGS...>]\n <- important newline
@@ -354,13 +358,13 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
         peer sender = list_args->sender;
         size_t peers_size = list_args->peers_size;
         peer *peers = list_args->peers;
-        char *temp = realloc(msg, sizeof(char) * msg_size_peer_list(peers_size));
+        temp = realloc(msg, sizeof(char) * msg_size_peer_list(peers_size));
         if(!temp) {
             fprintf(stderr, "Erro: Falha na alocacao da mensagem!\n");
             return NULL;
         }
         msg = temp;
-        sprintf(msg, "%s:%d %d PEER_LIST %d", ip, port, clock, (int)peers_size - 1);
+        sprintf(msg, "%s:%lu %d PEER_LIST %d", ip, port, clock, (int)peers_size - 1);
         for(int i = 0; i < peers_size; i++) {
             if(is_same_peer(sender, peers[i]))
                 continue;
@@ -369,41 +373,44 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
         sprintf(msg, "%s\n", msg);
         break;
     case LS_LIST:
+        ;
         lslist_msg_args *llargs = (lslist_msg_args *)args;
-        char *temp = realloc(msg, sizeof(char) * msg_size_files_list(llargs->list_len));
+        temp = realloc(msg, sizeof(char) * msg_size_files_list(llargs->list_len));
         if(!temp) {
             fprintf(stderr, "Erro: Falha na alocacao da mensagem!\n");
             return NULL;
         }
         msg = temp;
-        sprintf(msg, "%s:%d %d LS_LIST %d", ip, port, clock, (int)llargs->list_len);
+        sprintf(msg, "%s:%lu %d LS_LIST %d", ip, port, clock, (int)llargs->list_len);
         for(int i = 0; i < llargs->list_len; i++) {
             sprintf(msg, "%s %s:%d", msg, llargs->list[i], llargs->list_file_len[i]);
         }
         sprintf(msg, "%s\n", msg);
         break;
     case DL:
+        ;
         dl_msg_args *dargs = (dl_msg_args *)args;
-        char *temp = realloc(msg, sizeof(char) * msg_size_files_list(1));
+        temp = realloc(msg, sizeof(char) * msg_size_files_list(1));
         if(!temp) {
             fprintf(stderr, "Erro: Falha na alocacao da mensagem!\n");
             return NULL;
         }
         msg = temp;
-        sprintf(msg, "%s:%d %d DL %s %d %d\n", ip, port, clock, dargs->fname, dargs->a, dargs->b);
+        sprintf(msg, "%s:%lu %d DL %s %d %d\n", ip, port, clock, dargs->fname, dargs->a, dargs->b);
         break;
     case FILEMSG:
+        ;
         file_msg_args *fargs = (file_msg_args *)args;
-        char *temp = realloc(msg, sizeof(char) * (msg_size_files_list(1) + fargs->file_size));
+        temp = realloc(msg, sizeof(char) * (msg_size_files_list(1) + fargs->file_size));
         if(!temp) {
             fprintf(stderr, "Erro: Falha na alocacao da mensagem!\n");
             return NULL;
         }
         msg = temp;
-        sprintf(msg, "%s:%d %d FILE %s %d %d %s\n", ip, port, clock, fargs->file_name, fargs->a, fargs->b, fargs->contentb64);
+        sprintf(msg, "%s:%lu %d FILE %s %d %d %s\n", ip, port, clock, fargs->file_name, fargs->a, fargs->b, fargs->contentb64);
         break;
     default:
-        sprintf(msg, "%s:%d %d %s\n", ip, port, clock, message_string[msg_type]);
+        sprintf(msg, "%s:%lu %d %s\n", ip, port, clock, message_string[msg_type]);
         break;
     }
     return msg;
@@ -450,7 +457,7 @@ SOCKET send_message(const char *msg, peer *neighbour, MSG_TYPE msg_type) {
 // read message, mark its sender and return the message type
 MSG_TYPE read_message(const char *buf, peer *sender) {
     char *buf_cpy = malloc(sizeof(char) * MSG_SIZE);
-    strdup(buf_cpy, buf, MSG_SIZE);
+    strncpy(buf_cpy, buf, MSG_SIZE);
     char *tok_ip = strtok(buf_cpy, " ");
     int aclock = atoi(strtok(NULL, " "));
     char *tok_msg = strtok(NULL, " ");
@@ -506,10 +513,10 @@ char *check_msg_full(const char *buf, SOCKET sock, MSG_TYPE msg_type, void *args
             }
         }
         if(!is_full_msg) {
+            int spaces = 0;
             switch(msg_type) {
             case DL:
                 ;    
-                int spaces = 0;
                 char *aux_buf = malloc(sizeof(char) * msg_size_files_list(1));
                 if(!aux_buf) {
                     fprintf(stderr, "Erro: Falha na alocacao!\n");
@@ -518,11 +525,8 @@ char *check_msg_full(const char *buf, SOCKET sock, MSG_TYPE msg_type, void *args
                 sprintf(aux_buf, "%s", buf);
                 *valread = recv(sock, &aux_buf[*valread], msg_size_files_list(1), 0);
                 return aux_buf;
-            case FILEMSG:
-                break;
             default:
                 ;
-                int spaces = 0;
                 char *duplicate = malloc(sizeof(char) * 12);
                 if(!duplicate) {
                     fprintf(stderr, "Erro: Falha na alocacao!\n");
@@ -564,9 +568,9 @@ void append_file_list(const char *buf, ls_files *list, size_t list_len, peer sen
     strtok(NULL, " ");//clock
     strtok(NULL, " ");//type
     strtok(NULL, " ");//size
-    char *list = strtok(NULL, "\n");
+    char *list_rec = strtok(NULL, "\n");
 
-    if(!list) {
+    if(!list_rec) {
         fprintf(stderr, "Erro: Lista de arquivos nao encontrada!\n");
         free(cpy);
         return;
@@ -578,7 +582,7 @@ void append_file_list(const char *buf, ls_files *list, size_t list_len, peer sen
     for(int i = 0; i < rec_files_len; i++, info_count++) {
         //TODO:
         //msg = <name>:<size>
-        char cpy_l = strdup(list);
+        char *cpy_l = strdup(list_rec);
         for(int j = 0; j <= info_count; j++) {
             if(j == 0) p = strtok(cpy_l, " ");
             else p = strtok(NULL, " ");
@@ -603,9 +607,9 @@ char *get_file_in_msg(const char *buf, char **fname, int *a, int *b) {
     strtok(NULL, " "); //clock
     strtok(NULL, " "); //type
     char *infos = strtok(NULL, "\n");
-    char * a = strtok(NULL, " ");
+    char * n = strtok(infos, " ");
     if(fname)
-        *fname = a;
+        *fname = n;
     *a = atoi(strtok(NULL, " "));
     *b = atoi(strtok(NULL, " "));
     return strtok(NULL, " ");

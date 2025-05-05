@@ -90,7 +90,7 @@ char *dir_file_path(const char *dir_path, const char *file_name) {
     size_t d_path_size = strlen(dir_path);
     char *file_path = malloc(sizeof(char) * (strlen(file_name) + d_path_size));
     strncpy(file_path, dir_path, d_path_size);
-    file_path[d_path_size] = "/";
+    file_path[d_path_size] = '/';
     strncpy(file_path + d_path_size, file_name, strlen(file_name));
     return file_path;
 }

@@ -153,7 +153,7 @@ int main(int argc, char **argv)
     peer **peers = malloc(sizeof(peer *));
     int comm;
     size_t *peers_size = malloc(sizeof(size_t)), files_len = 0;
-    char **peers_txt, ***files;
+    char **peers_txt, **files;
     pthread_t listener_thread;
 
     if(!peers || !peers_size) {
@@ -210,7 +210,7 @@ int main(int argc, char **argv)
             show_files(files, files_len);
             break;
         case 4:
-            get_files(&server, &clock_lock, *peers, *peers_size, argv[3], &files, &files_len);
+            get_files(&server, &clock_lock, *peers, *peers_size, argv[3], files, &files_len);
             break;
         case 5:
             // show_statistics();
