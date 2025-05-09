@@ -474,6 +474,7 @@ SOCKET send_message(const char *msg, peer *neighbour, MSG_TYPE msg_type) {
 // read message, mark its sender and return the message type
 MSG_TYPE read_message(const char *buf, peer *sender) {
     char *buf_cpy = malloc(sizeof(char) * MSG_SIZE);
+    if(!buf_cpy) return UNEXPECTED_MSG_TYPE;
     strncpy(buf_cpy, buf, MSG_SIZE);
     char *tok_ip = strtok(buf_cpy, " ");
     int aclock = atoi(strtok(NULL, " "));
@@ -520,7 +521,7 @@ MSG_TYPE read_message(const char *buf, peer *sender) {
 
 
 // check if message received was read fully
-char *check_msg_full(const char *buf, SOCKET sock, MSG_TYPE msg_type, void *args, ssize_t *valread) { //TODO: Ajeitar funcao para aceitar tipos de mensagens novos 
+char *check_msg_full(const char *buf, SOCKET sock, MSG_TYPE msg_type, void *args, ssize_t *valread) { 
     bool is_full_msg = false;    
     if(*valread == MSG_SIZE - 1) {
         for(int i = 0; i < *valread; i++) {
@@ -563,8 +564,8 @@ char *check_msg_full(const char *buf, SOCKET sock, MSG_TYPE msg_type, void *args
                             int new_size = 0;
                             if(msg_type == LS_LIST) new_size = msg_size_files_list(*rec_size);
                             else if(msg_type == PEER_LIST) new_size = msg_size_peer_list(*rec_size); 
-                            char *aux_buf;
-                            aux_buf = malloc(sizeof(char) * new_size);
+                            else new_size = msg_size_peer_list(*rec_size);
+                            char *aux_buf = malloc(sizeof(char) * new_size);
                             if(!aux_buf) return NULL;
                             sprintf(aux_buf, "%s", buf);
                             *valread += recv(sock, &aux_buf[*valread], new_size, 0);
