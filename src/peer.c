@@ -65,7 +65,7 @@ peer *create_peers(const char **peers_ip, size_t peers_size) {
 int append_peer(peer **peers, size_t *peers_size, peer new_peer, int *i, char *file) {
     peer *new_peers = realloc(*peers, (*peers_size + 1) * sizeof(peer));
     if(!new_peers) {
-        fprintf(stderr, "Erro: Falha na alocacao de memoria");
+        fprintf(stderr, "Erro: Falha na alocacao de new_peers");
         return -1; // FIXME: tratar possivel erro
     }
     *peers = new_peers;
@@ -110,7 +110,7 @@ void append_list_peers(const char *buf, peer **peers, size_t *peers_size, size_t
     peer *rec_peers_list = malloc(sizeof(peer) * rec_peers_size);
 
     if(!rec_peers_list) {
-        fprintf(stderr, "Erro: Falha na alocacao de memoria");
+        fprintf(stderr, "Erro: Falha na alocacao de rec_peers_list");
         free(cpy);
         return;
     }

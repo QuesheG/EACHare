@@ -45,7 +45,7 @@ void *treat_request(void *args) {
     pthread_mutex_lock(&clock_lock);
     server.p_clock = max(server.p_clock, sender.p_clock);
     pthread_mutex_unlock(&clock_lock);
-    
+
     printf("\n");
     printf("\tMensagem recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
     pthread_mutex_lock(&clock_lock);
@@ -68,7 +68,7 @@ void *treat_request(void *args) {
         share_peers_list(&server, &clock_lock, n_sock, &(*peers)[i], *peers, *peers_size);
         break;
     case LS:
-        share_files_list(&server, &clock_lock, n_sock, dir_path);
+        share_files_list(&server, &clock_lock, n_sock, &(*peers)[i], dir_path);
         break;
     case DL:
         send_file(&server, &clock_lock, buf, n_sock, dir_path);
@@ -180,7 +180,7 @@ int main(int argc, char **argv)
 
     // read directory
     files = get_dir_files(argv[3], &files_len);
-    
+
     listen_args *args = send_args(server, peers, peers_size, argv[2], 0, argv[3]);
     pthread_create(&listener_thread, NULL, listen_socket, (void *)args);
 
