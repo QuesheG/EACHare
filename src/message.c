@@ -158,8 +158,6 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
             buf = temp;
         }
         buf[valread] = '\0';
-
-        printf("\n\n%p, %d %d\n", files, sizeof(ls_files), files_list_len + rec_files_size);
         ls_files *temp1 = realloc(files, sizeof(ls_files) * (files_list_len + rec_files_size));
         if(!temp1 || rec_files_size == 0) {
             printf("\n");
@@ -205,7 +203,7 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
     for(int i = 0; i < files_list_len; i++) {
         printf("[%0*d] ", count_size, i + 1);
         printf("%-*s", max_fname_size, files[i].file.fname);
-        printf("%-*d", max_fname_size, files[i].file.fsize);
+        printf("%-*d", max_fname_size, (int)files[i].file.fsize);
         printf("%s\n", inet_ntoa(files[i].holder.con.sin_addr));
     }
     printf("Digite o numero do arquivo para fazer o download:\n");
@@ -307,7 +305,6 @@ void share_files_list(peer *server, pthread_mutex_t *clock_lock, SOCKET con, pee
     for(size_t i = 0; i < files_len; i++) {
         char *file = dir_file_path(dir_path, files[i]);
         llargs->list_file_len[i] = fsize(file);
-        printf("\n\n%s:%d\n", file, llargs->list_file_len[i]);
     }
     llargs->list_len = files_len;
     char *msg = build_message(server->con, server->p_clock, LS_LIST, (void *)llargs);
@@ -332,7 +329,7 @@ void send_file(peer *server, pthread_mutex_t *clock_lock, char *buf, SOCKET con,
     FILE *file = fopen(file_path, "r");
     fargs->file_size = fsize(file_path);
     char *file_cont = malloc(sizeof(char) * fargs->file_size);
-    fread(file, fargs->file_size, 1, file);
+    fread(file_cont, fargs->file_size, 1, file);
     char *encoded = malloc(sizeof(char) * base64encode_len(fargs->file_size));
     base64_encode(encoded, file_cont, fargs->file_size);
     fargs->contentb64 = encoded;
@@ -403,7 +400,7 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
         msg = temp;
         sprintf(msg, "%s:%u %d LS_LIST %d", ip, port, clock, (int)llargs->list_len);
         for(int i = 0; i < llargs->list_len; i++) {
-            sprintf(msg, "%s %s:%d", msg, llargs->list[i], llargs->list_file_len[i]);
+            sprintf(msg, "%s %s:%d", msg, llargs->list[i], (int)llargs->list_file_len[i]);
         }
         sprintf(msg, "%s\n", msg);
         break;
