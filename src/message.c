@@ -160,7 +160,6 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
         buf[valread] = '\0';
         ls_files *temp1 = realloc(files, sizeof(ls_files) * (files_list_len + rec_files_size));
         if(!temp1 || rec_files_size == 0) {
-            printf("\n");
             printf("\tResposta recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
             free(buf);
             free(msg);
@@ -170,8 +169,7 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
         files = temp1;
         files_list_len += rec_files_size;
 
-        printf("\n");
-        printf("\tResposta recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
+        printf("\tResposta recebida: \"%.*s\"\n\n", (int)strcspn(buf, "\n"), buf);
         append_files_list(buf, files, files_list_len, sender, rec_files_size);
         sock_close(req);
         free(msg);
@@ -521,8 +519,8 @@ MSG_TYPE read_message(const char *buf, peer *sender) {
 
 
 // check if message received was read fully
-char *check_msg_full(const char *buf, SOCKET sock, MSG_TYPE msg_type, void *args, ssize_t *valread) { 
-    bool is_full_msg = false;    
+char *check_msg_full(const char *buf, SOCKET sock, MSG_TYPE msg_type, void *args, ssize_t *valread) {
+    bool is_full_msg = false;
     if(*valread == MSG_SIZE - 1) {
         for(int i = 0; i < *valread; i++) {
             if(buf[i] == '\n') {
@@ -542,9 +540,10 @@ char *check_msg_full(const char *buf, SOCKET sock, MSG_TYPE msg_type, void *args
                 sprintf(aux_buf, "%s", buf);
                 *valread = recv(sock, &aux_buf[*valread], msg_size_files_list(1), 0);
                 return aux_buf;
-                int spaces = 0;
+                break;
             default:
                 ;
+                int spaces = 0;
                 char *duplicate = calloc(MSG_SIZE, sizeof(char));
                 if(!duplicate) {
                     fprintf(stderr, "Erro: Falha na alocacao!\n");
@@ -563,12 +562,11 @@ char *check_msg_full(const char *buf, SOCKET sock, MSG_TYPE msg_type, void *args
                             free(duplicate);
                             int new_size = 0;
                             if(msg_type == LS_LIST) new_size = msg_size_files_list(*rec_size);
-                            else if(msg_type == PEER_LIST) new_size = msg_size_peer_list(*rec_size); 
                             else new_size = msg_size_peer_list(*rec_size);
                             char *aux_buf = calloc(new_size, sizeof(char));
                             if(!aux_buf) return NULL;
                             sprintf(aux_buf, "%s", buf);
-                            *valread += recv(sock, &aux_buf[*valread], new_size, 0);
+                            *valread += recv(sock, &(aux_buf[*valread]), new_size, 0);
                             return aux_buf;
                         }
                     }
