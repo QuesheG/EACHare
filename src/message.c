@@ -534,7 +534,7 @@ char *check_msg_full(const char *buf, SOCKET sock, MSG_TYPE msg_type, void *args
             switch(msg_type) {
             case DL:
                 ;
-                char *aux_buf = malloc(sizeof(char) * msg_size_files_list(1));
+                char *aux_buf = calloc(msg_size_files_list(1), sizeof(char));
                 if(!aux_buf) {
                     fprintf(stderr, "Erro: Falha na alocacao!\n");
                     return NULL;
@@ -545,7 +545,7 @@ char *check_msg_full(const char *buf, SOCKET sock, MSG_TYPE msg_type, void *args
                 int spaces = 0;
             default:
                 ;
-                char *duplicate = malloc(sizeof(char) * MSG_SIZE);
+                char *duplicate = calloc(MSG_SIZE, sizeof(char));
                 if(!duplicate) {
                     fprintf(stderr, "Erro: Falha na alocacao!\n");
                     return NULL;
@@ -565,7 +565,7 @@ char *check_msg_full(const char *buf, SOCKET sock, MSG_TYPE msg_type, void *args
                             if(msg_type == LS_LIST) new_size = msg_size_files_list(*rec_size);
                             else if(msg_type == PEER_LIST) new_size = msg_size_peer_list(*rec_size); 
                             else new_size = msg_size_peer_list(*rec_size);
-                            char *aux_buf = malloc(sizeof(char) * new_size);
+                            char *aux_buf = calloc(new_size, sizeof(char));
                             if(!aux_buf) return NULL;
                             sprintf(aux_buf, "%s", buf);
                             *valread += recv(sock, &aux_buf[*valread], new_size, 0);
@@ -579,7 +579,7 @@ char *check_msg_full(const char *buf, SOCKET sock, MSG_TYPE msg_type, void *args
     }
     else if(args) {
         int spaces = 0;
-        char *duplicate = malloc(sizeof(char) * MSG_SIZE);
+        char *duplicate = calloc(MSG_SIZE, sizeof(char));
         if(!duplicate) {
             fprintf(stderr, "Erro: Falha na alocacao!\n");
             return NULL;
