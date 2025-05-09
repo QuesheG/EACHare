@@ -25,6 +25,10 @@ for i in range(8):
     os.chdir("g0" + str(i))
     try: os.mkdir("files")
     except: pass
+    os.chdir("files")
+    with open("Arquivo_Teste.txt", "w") as file:
+        file.write("nada para se ver aqui!\nVoce ira esquecer das mentiras e da revelacao que o futuro que o aguarda foi em vao+/;!\n")
+    os.chdir("..")
     for j in range(8):
         if network[i][j]:
             with open(f_peers, "a") as file:

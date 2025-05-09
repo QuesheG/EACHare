@@ -89,9 +89,9 @@ void get_peers(peer *server, pthread_mutex_t *clock_lock, peer **peers, size_t *
             free(buf);
             buf = temp;
         }
-        
+
         buf[valread] = '\0';
-        
+
         printf("\n");
         printf("\tResposta recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
         append_list_peers(buf, peers, peers_size, rec_peers_size, file);
@@ -123,7 +123,7 @@ void share_peers_list(peer *server, pthread_mutex_t *clock_lock, SOCKET soc, pee
 void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t peers_size, char *dir_path, char **files_list, size_t *files_len) {
     //FIXME: diminuir função?
     ls_files *files;
-    size_t files_list_len = 0;;
+    size_t files_list_len = 0;
     for(int i = 0; i < peers_size; i++) {
         if(peers[i].status == OFFLINE) continue;
         pthread_mutex_lock(clock_lock);
@@ -157,13 +157,16 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
             free(buf);
             buf = temp;
         }
-
         buf[valread] = '\0';
 
+        printf("\n\n%p, %d %d\n", files, sizeof(ls_files), files_list_len + rec_files_size);
         ls_files *temp1 = realloc(files, sizeof(ls_files) * (files_list_len + rec_files_size));
-        if(!temp1) {
-            free(temp1);
+        if(!temp1 || rec_files_size == 0) {
+            printf("\n");
+            printf("\tResposta recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
             free(buf);
+            free(msg);
+            sock_close(req);
             continue;
         }
         files = temp1;
@@ -186,7 +189,7 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
     uint16_t count_size = floor(log10(files_list_len)) + 1;
     //print header
     printf("%*.s ", count_size + 3, "");
-    printf("%-*s ", max_fname_size, "Name");
+    printf("%-*s ", max_fname_size, "Nome");
     printf("|");
     printf(" %-*s ", max_fsize_size, "Tamanho");
     printf("|");
@@ -304,6 +307,7 @@ void share_files_list(peer *server, pthread_mutex_t *clock_lock, SOCKET con, pee
     for(size_t i = 0; i < files_len; i++) {
         char *file = dir_file_path(dir_path, files[i]);
         llargs->list_file_len[i] = fsize(file);
+        printf("\n\n%s:%d\n", file, llargs->list_file_len[i]);
     }
     llargs->list_len = files_len;
     char *msg = build_message(server->con, server->p_clock, LS_LIST, (void *)llargs);
@@ -520,7 +524,7 @@ MSG_TYPE read_message(const char *buf, peer *sender) {
 
 // check if message received was read fully
 char *check_msg_full(const char *buf, SOCKET sock, MSG_TYPE msg_type, void *args, ssize_t *valread) { //TODO: Ajeitar funcao para aceitar tipos de mensagens novos 
-    bool is_full_msg = false;
+    bool is_full_msg = false;    
     if(*valread == MSG_SIZE - 1) {
         for(int i = 0; i < *valread; i++) {
             if(buf[i] == '\n') {
@@ -529,7 +533,6 @@ char *check_msg_full(const char *buf, SOCKET sock, MSG_TYPE msg_type, void *args
             }
         }
         if(!is_full_msg) {
-            int spaces = 0;
             switch(msg_type) {
             case DL:
                 ;
@@ -541,6 +544,7 @@ char *check_msg_full(const char *buf, SOCKET sock, MSG_TYPE msg_type, void *args
                 sprintf(aux_buf, "%s", buf);
                 *valread = recv(sock, &aux_buf[*valread], msg_size_files_list(1), 0);
                 return aux_buf;
+                int spaces = 0;
             default:
                 ;
                 char *duplicate = malloc(sizeof(char) * MSG_SIZE);
@@ -559,7 +563,9 @@ char *check_msg_full(const char *buf, SOCKET sock, MSG_TYPE msg_type, void *args
                             duplicate[strcspn(duplicate, " ")] = '\0';
                             *rec_size = atoi(duplicate);
                             free(duplicate);
-                            int new_size = msg_size_peer_list(*rec_size);
+                            int new_size = 0;
+                            if(msg_type == LS_LIST) new_size = msg_size_files_list(*rec_size);
+                            else if(msg_type == PEER_LIST) new_size = msg_size_peer_list(*rec_size); 
                             char *aux_buf;
                             aux_buf = malloc(sizeof(char) * new_size);
                             if(!aux_buf) return NULL;
@@ -570,6 +576,29 @@ char *check_msg_full(const char *buf, SOCKET sock, MSG_TYPE msg_type, void *args
                     }
                 }
                 break;
+            }
+        }
+    }
+    else if(args) {
+        int spaces = 0;
+        char *duplicate = malloc(sizeof(char) * MSG_SIZE);
+        if(!duplicate) {
+            fprintf(stderr, "Erro: Falha na alocacao!\n");
+            return NULL;
+        }
+        int *rec_size = (int *)args;
+        for(int i = 0; i < *valread; i++) {
+            if(buf[i] == ' ') {
+                spaces++;
+                if(spaces == 3) {
+                    strncpy(duplicate, &buf[i + 1], 11);
+                }
+                if(spaces == 4 && duplicate) {
+                    duplicate[strcspn(duplicate, " ")] = '\0';
+                    *rec_size = atoi(duplicate);
+                    free(duplicate);
+                    return NULL;
+                }
             }
         }
     }

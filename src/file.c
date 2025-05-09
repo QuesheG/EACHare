@@ -95,18 +95,23 @@ void show_files(const char **files, size_t file_len) {
 
 char *dir_file_path(const char *dir_path, const char *file_name) {
     size_t d_path_size = strlen(dir_path);
-    char *file_path = malloc(sizeof(char) * (strlen(file_name) + d_path_size));
+    size_t ch_file_size = strlen(file_name);
+    char *file_path = malloc(sizeof(char) * (ch_file_size + d_path_size + 2));
     strncpy(file_path, dir_path, d_path_size);
     file_path[d_path_size] = '/';
-    strncpy(file_path + d_path_size, file_name, strlen(file_name));
+    strncpy(file_path + d_path_size + sizeof(char), file_name, ch_file_size);
+    file_path[d_path_size + ch_file_size + 1] = '\0';
     return file_path;
 }
 
 int fsize(const char *file) {
     FILE *fp = fopen(file, "r");
-    int prev=ftell(fp);
+    if(!fp) {
+        fprintf(stderr, "Erro: Falha lendo arquivo!\n");
+        return -1;
+    }
     fseek(fp, 0L, SEEK_END);
     int sz=ftell(fp);
-    fseek(fp,prev,SEEK_SET); //go back to where we were
+    fclose(fp);
     return sz;
 }
