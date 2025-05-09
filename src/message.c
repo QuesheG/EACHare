@@ -120,9 +120,8 @@ void share_peers_list(peer *server, pthread_mutex_t *clock_lock, SOCKET soc, pee
 
 
 // asks for files of all peers 
-void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t peers_size, char *dir_path, char **files_list, size_t *files_len) {
-    //FIXME: diminuir função?
-    ls_files *files;
+void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t peers_size, char *dir_path, char ***files_list, size_t *files_len) {
+    ls_files *files = NULL;
     size_t files_list_len = 0;
     for(int i = 0; i < peers_size; i++) {
         if(peers[i].status == OFFLINE) continue;
@@ -169,7 +168,8 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
         files = temp1;
         files_list_len += rec_files_size;
 
-        printf("\tResposta recebida: \"%.*s\"\n\n", (int)strcspn(buf, "\n"), buf);
+        printf("\tResposta recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
+        printf("\n");
         append_files_list(buf, files, files_list_len, sender, rec_files_size);
         sock_close(req);
         free(msg);
@@ -184,7 +184,7 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
     }
     uint16_t count_size = floor(log10(files_list_len)) + 1;
     //print header
-    printf("%*.s ", count_size + 3, "");
+    printf("%*.s ", count_size + 2, "");
     printf("%-*s ", max_fname_size, "Nome");
     printf("|");
     printf(" %-*s ", max_fsize_size, "Tamanho");
@@ -201,8 +201,10 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
     for(int i = 0; i < files_list_len; i++) {
         printf("[%0*d] ", count_size, i + 1);
         printf("%-*s", max_fname_size, files[i].file.fname);
-        printf("%-*d", max_fname_size, (int)files[i].file.fsize);
-        printf("%s\n", inet_ntoa(files[i].holder.con.sin_addr));
+        printf(" | ");
+        printf("%-*d", max_fsize_size, (int)files[i].file.fsize);
+        printf(" | ");
+        printf("%s:%d\n", inet_ntoa(files[i].holder.con.sin_addr), ntohs(files[i].holder.con.sin_port));
     }
     printf("Digite o numero do arquivo para fazer o download:\n");
     int f_to_down = 0;
@@ -247,7 +249,7 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
     char *file_path = dir_file_path(dir_path, files[f_to_down].file.fname);
     FILE *new_file = fopen(file_path, "w");
     fwrite(file_decoded, files[f_to_down].file.fsize, 1, new_file);
-    char **temp = realloc(files_list, sizeof(char *) * (*files_len + 1));
+    char **temp = realloc(*files_list, sizeof(char *) * (*files_len + 1));
     if(!temp) {
         fprintf(stderr, "Erro: Falha na alocacao");
         free(file_b64);
@@ -260,8 +262,8 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
         free(temp);
         return;
     }
-    files_list = temp;
-    files_list[*files_len] = strdup(files[f_to_down].file.fname);
+    *files_list = temp;
+    *files_list[*files_len] = strdup(files[f_to_down].file.fname);
     (*files_len)++;
     free(files);
     free(file_b64);
@@ -306,8 +308,8 @@ void share_files_list(peer *server, pthread_mutex_t *clock_lock, SOCKET con, pee
     }
     llargs->list_len = files_len;
     char *msg = build_message(server->con, server->p_clock, LS_LIST, (void *)llargs);
-    send(con, msg, strlen(msg) + 1, 0);
-    printf("\tEncaminhando mensagem \"%.*s\" para %s:%d\n", (int)strcspn(msg, "\n"), msg, inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port));
+    if(send(con, msg, strlen(msg) + 1, 0))
+        printf("\tEncaminhando mensagem \"%.*s\" para %s:%d\n", (int)strcspn(msg, "\n"), msg, inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port));
     for(int i = 0; i < files_len; i++) {
         free(files[i]);
     }

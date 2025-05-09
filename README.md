@@ -31,5 +31,4 @@ This product includes software developed by the Apache Group for use in the Apac
 ## TODO:
 Testes
 Cheque teste do prof (obter peers -> listar peers erro)
-Obter peers crash
-Falha lendo mensagem buscar arquivos
+Falha lendo arquivos após recebimento
