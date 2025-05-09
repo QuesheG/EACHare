@@ -83,20 +83,18 @@ void get_peers(peer *server, pthread_mutex_t *clock_lock, peer **peers, size_t *
         }
         peer sender;
         MSG_TYPE msg_type = read_message(buf, &sender);
-
-        int *rec_peers_size = malloc(sizeof(int));
-        char *temp = check_msg_full(buf, req, msg_type, (void *)rec_peers_size, &valread);
+        int rec_peers_size = 0;
+        char *temp = check_msg_full(buf, req, msg_type, (void *)&rec_peers_size, &valread);
         if(temp) {
             free(buf);
             buf = temp;
         }
-
+        
         buf[valread] = '\0';
-
+        
         printf("\n");
         printf("\tResposta recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
-        append_list_peers(buf, peers, peers_size, *rec_peers_size, file);
-        free(rec_peers_size);
+        append_list_peers(buf, peers, peers_size, rec_peers_size, file);
         sock_close(req);
         free(msg);
     }
@@ -104,18 +102,17 @@ void get_peers(peer *server, pthread_mutex_t *clock_lock, peer **peers, size_t *
 
 
 // share the peers list with who requested
-void share_peers_list(peer *server, pthread_mutex_t *clock_lock, SOCKET soc, peer *sender, peer *peers, size_t peers_size) {
+void share_peers_list(peer *server, pthread_mutex_t *clock_lock, SOCKET soc, peer sender, peer *peers, size_t peers_size) {
     peer_list_args args;
-    args.sender = *sender;
+    args.sender = sender;
     args.peers = peers;
     args.peers_size = peers_size;
     char *msg = build_message(server->con, server->p_clock, PEER_LIST, (void *)&args);
-    printf("%s %d", msg, ntohs(sender->con.sin_port));
     pthread_mutex_lock(clock_lock);
     server->p_clock++;
     pthread_mutex_unlock(clock_lock);
     printf("\t=> Atualizando relogio para %d\n", server->p_clock);
-    printf("\tEncaminhando mensagem \"%.*s\" para %s:%d\n", (int)strcspn(msg, "\n"), msg, inet_ntoa(sender->con.sin_addr), ntohs(sender->con.sin_port));
+    printf("\tEncaminhando mensagem \"%.*s\" para %s:%d\n", (int)strcspn(msg, "\n"), msg, inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port));
     send(soc, msg, strlen(msg) + 1, 0);
     sock_close(soc);
     free(msg);
@@ -154,8 +151,8 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
         peer sender;
         MSG_TYPE msg_type = read_message(buf, &sender);
 
-        size_t *rec_files_size = malloc(sizeof(size_t));
-        char *temp = check_msg_full(buf, req, msg_type, (void *)rec_files_size, &valread);
+        size_t rec_files_size = 0;
+        char *temp = check_msg_full(buf, req, msg_type, (void *)&rec_files_size, &valread);
         if(temp) {
             free(buf);
             buf = temp;
@@ -163,20 +160,18 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
 
         buf[valread] = '\0';
 
-        ls_files *temp1 = realloc(files, sizeof(ls_files) * (files_list_len + *rec_files_size));
+        ls_files *temp1 = realloc(files, sizeof(ls_files) * (files_list_len + rec_files_size));
         if(!temp1) {
             free(temp1);
-            free(rec_files_size);
             free(buf);
             continue;
         }
         files = temp1;
-        files_list_len += *rec_files_size;
+        files_list_len += rec_files_size;
 
         printf("\n");
         printf("\tResposta recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
-        append_files_list(buf, files, files_list_len, sender, *rec_files_size);
-        free(rec_files_size);
+        append_files_list(buf, files, files_list_len, sender, rec_files_size);
         sock_close(req);
         free(msg);
     }
@@ -190,7 +185,7 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
     }
     uint16_t count_size = floor(log10(files_list_len)) + 1;
     //print header
-    printf("[%*.s] ", count_size, "");
+    printf("%*.s ", count_size + 3, "");
     printf("%-*s ", max_fname_size, "Name");
     printf("|");
     printf(" %-*s ", max_fsize_size, "Tamanho");
@@ -281,21 +276,31 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
 
 
 //send list of files
-void share_files_list(peer *server, pthread_mutex_t *clock_lock, SOCKET con, char *dir_path) {
+void share_files_list(peer *server, pthread_mutex_t *clock_lock, SOCKET con, peer sender, char *dir_path) {
     size_t files_len = 0;
     char **files = get_dir_files(dir_path, &files_len);
-    if(!files) return;
+    if(!files) {
+        lslist_msg_args *llargs = malloc(sizeof(lslist_msg_args));
+        llargs->list_len = 0;
+        char *msg = build_message(server->con, server->p_clock, LS_LIST, (void *)llargs);
+        send(con, msg, strlen(msg) + 1, 0);
+        sock_close(con);
+        printf("\tEncaminhando mensagem \"%.*s\" para %s:%d\n", (int)strcspn(msg, "\n"), msg, inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port));
+        free(llargs);
+        free(msg);
+        return;
+    }
     lslist_msg_args *llargs = malloc(sizeof(lslist_msg_args));
+    llargs->list_file_len = malloc(sizeof(size_t) * files_len);
     llargs->list = files;
     for (size_t i = 0; i < files_len; i++) {
         char *file = dir_file_path(dir_path, files[i]);
         llargs->list_file_len[i] = fsize(file);
     }
-    
-    llargs->list_file_len = 0;
     llargs->list_len = files_len;
     char *msg = build_message(server->con, server->p_clock, LS_LIST, (void *)llargs);
     send(con, msg, strlen(msg) + 1, 0);
+    printf("\tEncaminhando mensagem \"%.*s\" para %s:%d\n", (int)strcspn(msg, "\n"), msg, inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port));
     for(int i = 0; i < files_len; i++) {
         free(files[i]);
     }
@@ -373,6 +378,10 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
     case LS_LIST:
         ;
         lslist_msg_args *llargs = (lslist_msg_args *)args;
+        if(llargs->list_len == 0) {
+            sprintf(msg, "%s:%u %d LS_LIST 0\n", ip, port, clock);
+            return msg;
+        }
         temp = realloc(msg, sizeof(char) * msg_size_files_list(llargs->list_len));
         if(!temp) {
             fprintf(stderr, "Erro: Falha na alocacao da mensagem!\n");
@@ -525,7 +534,7 @@ char *check_msg_full(const char *buf, SOCKET sock, MSG_TYPE msg_type, void *args
                 return aux_buf;
             default:
                 ;
-                char *duplicate = malloc(sizeof(char) * 12);
+                char *duplicate = malloc(sizeof(char) * MSG_SIZE);
                 if(!duplicate) {
                     fprintf(stderr, "Erro: Falha na alocacao!\n");
                     return NULL;

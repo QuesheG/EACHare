@@ -11,6 +11,8 @@
 #include <sock.h>
 #include <threading.h>
 
+#define max(a,b) ((a)>(b)?(a):(b))
+
 bool should_quit = false;
 pthread_mutex_t clock_lock;
 
@@ -65,10 +67,10 @@ void *treat_request(void *args) {
     }
     switch(msg_type) {
     case GET_PEERS:
-        share_peers_list(&server, &clock_lock, n_sock, &(*peers)[i], *peers, *peers_size);
+        share_peers_list(&server, &clock_lock, n_sock, (*peers)[i], *peers, *peers_size);
         break;
     case LS:
-        share_files_list(&server, &clock_lock, n_sock, dir_path);
+        share_files_list(&server, &clock_lock, n_sock, (*peers)[i], dir_path);
         break;
     case DL:
         send_file(&server, &clock_lock, buf, n_sock, dir_path);

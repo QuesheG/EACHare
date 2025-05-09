@@ -63,12 +63,19 @@ char **get_dir_files(const char *dir_path, size_t *len) {
                 free(files[i]);
             }
             free(files);
+            closedir(dir);
             return NULL;
         }
         files = temp;
-        int d_len = strlen(dir_ent->d_name) + 1;
-        files[*len] = malloc(sizeof(char) * d_len);
-        strncpy(files[*len], dir_ent->d_name, d_len);
+        files[*len] = strdup(dir_ent->d_name);
+        if(!files[*len]) {
+            for(size_t i = 0; i < *len; i++) {
+                free(files[i]);
+            }
+            free(files);
+            closedir(dir);
+            return NULL;
+        }
         *len += 1;
     }
     closedir(dir);

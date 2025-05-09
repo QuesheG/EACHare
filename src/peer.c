@@ -91,7 +91,6 @@ int peer_in_list(peer a, peer *neighbours, size_t peers_size) {
 }
 
 // append received list to known peer list
-//FIXME: pass this to peer.c
 void append_list_peers(const char *buf, peer **peers, size_t *peers_size, size_t rec_peers_size, char *file) {
     char *cpy = strdup(buf);
     strtok(cpy, " "); //ip
@@ -132,7 +131,7 @@ void append_list_peers(const char *buf, peer **peers, size_t *peers_size, size_t
             if(j == 3) rec_peers_list[i].p_clock = atoi(infon);
             infon = strtok(NULL, ":");
         }
-
+        
         bool add = true;
         for(int j = 0; j < *peers_size; j++) {
             if(is_same_peer(rec_peers_list[i], (*peers)[j])) {
