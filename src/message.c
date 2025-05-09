@@ -307,7 +307,6 @@ void share_files_list(peer *server, pthread_mutex_t *clock_lock, SOCKET con, pee
     }
     llargs->list_len = files_len;
     char *msg = build_message(server->con, server->p_clock, LS_LIST, (void *)llargs);
-    printf("\tEncaminhando mensagem \"%.*s\" para %s:%d\n", (int)strcspn(msg, "\n"), msg, inet_ntoa(sender->con.sin_addr), ntohs(sender->con.sin_port));
     send(con, msg, strlen(msg) + 1, 0);
     printf("\tEncaminhando mensagem \"%.*s\" para %s:%d\n", (int)strcspn(msg, "\n"), msg, inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port));
     for(int i = 0; i < files_len; i++) {
