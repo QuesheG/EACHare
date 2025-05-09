@@ -9,7 +9,7 @@
 #include <threading.h>
 #include <base64.h>
 
-char *message_string[] = { "UNEXPECTED_MSG_TYPE", "HELLO", "GET_PEERS", "PEER_LIST", "LS", "LS_LIST", "DL", "FILE", "BYE"};
+char *message_string[] = { "UNEXPECTED_MSG_TYPE", "HELLO", "GET_PEERS", "PEER_LIST", "LS", "LS_LIST", "DL", "FILE", "BYE" };
 
 // print the peers in list
 void show_peers(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t peers_size) {
@@ -240,7 +240,7 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
 
     printf("\n");
     printf("\tResposta recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
-    
+
     int a, b;
     char *file_b64 = get_file_in_msg(buf, NULL, &a, &b);
     char *file_decoded = malloc(sizeof(char) * files[f_to_down].file.fsize);
@@ -291,14 +291,23 @@ void share_files_list(peer *server, pthread_mutex_t *clock_lock, SOCKET con, pee
         return;
     }
     lslist_msg_args *llargs = malloc(sizeof(lslist_msg_args));
+    if(!llargs) {
+        fprintf(stderr, "Erro: Falha na alocacao de llargs\n");
+        return;
+    }
     llargs->list_file_len = malloc(sizeof(size_t) * files_len);
+    if(!llargs->list_file_len) {
+        fprintf(stderr, "Erro: Falha na alocacao de list_file_len\n");
+        return;
+    }
     llargs->list = files;
-    for (size_t i = 0; i < files_len; i++) {
+    for(size_t i = 0; i < files_len; i++) {
         char *file = dir_file_path(dir_path, files[i]);
         llargs->list_file_len[i] = fsize(file);
     }
     llargs->list_len = files_len;
     char *msg = build_message(server->con, server->p_clock, LS_LIST, (void *)llargs);
+    printf("\tEncaminhando mensagem \"%.*s\" para %s:%d\n", (int)strcspn(msg, "\n"), msg, inet_ntoa(sender->con.sin_addr), ntohs(sender->con.sin_port));
     send(con, msg, strlen(msg) + 1, 0);
     printf("\tEncaminhando mensagem \"%.*s\" para %s:%d\n", (int)strcspn(msg, "\n"), msg, inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port));
     for(int i = 0; i < files_len; i++) {
@@ -306,6 +315,7 @@ void share_files_list(peer *server, pthread_mutex_t *clock_lock, SOCKET con, pee
     }
     sock_close(con);
     free(files);
+    free(llargs->list_file_len);
     free(llargs);
     free(msg);
 }
@@ -342,7 +352,7 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
     char *msg = malloc(sizeof(char) * MSG_SIZE);
 
     if(!msg) {
-        fprintf(stderr, "Erro: Falha na alocacao de memoria\n");
+        fprintf(stderr, "Erro: Falha na alocacao de msg\n");
         return NULL;
     }
     if(msg_type < 0 || msg_type > BYE) {
@@ -523,7 +533,7 @@ char *check_msg_full(const char *buf, SOCKET sock, MSG_TYPE msg_type, void *args
             int spaces = 0;
             switch(msg_type) {
             case DL:
-                ;    
+                ;
                 char *aux_buf = malloc(sizeof(char) * msg_size_files_list(1));
                 if(!aux_buf) {
                     fprintf(stderr, "Erro: Falha na alocacao!\n");
@@ -614,7 +624,7 @@ char *get_file_in_msg(const char *buf, char **fname, int *a, int *b) {
     strtok(NULL, " "); //clock
     strtok(NULL, " "); //type
     char *infos = strtok(NULL, "\n");
-    char * n = strtok(infos, " ");
+    char *n = strtok(infos, " ");
     if(fname)
         *fname = n;
     *a = atoi(strtok(NULL, " "));
