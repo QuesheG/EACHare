@@ -73,7 +73,7 @@ void get_peers(peer *server, pthread_mutex_t *clock_lock, peer **peers, size_t *
             free(msg);
             continue;
         }
-        char *buf = malloc(sizeof(char) * MSG_SIZE);
+        char *buf = calloc(MSG_SIZE, sizeof(char));
         ssize_t valread = recv(req, buf, MSG_SIZE - 1, 0);
         if(valread <= 0) {
             fprintf(stderr, "\nErro: Falha lendo mensagem\n");
@@ -140,7 +140,7 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
             free(msg);
             continue;
         }
-        char *buf = malloc(sizeof(char) * MSG_SIZE);
+        char *buf = calloc(MSG_SIZE, sizeof(char));
         ssize_t valread = recv(req, buf, MSG_SIZE - 1, 0);
         if(valread <= 0) {
             fprintf(stderr, "\nErro: Falha lendo mensagem\n");
@@ -229,7 +229,7 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
         return;
     }
     size_t temp_size = MSG_SIZE + 26 + base64encode_len(files[f_to_down].file.fsize);
-    char *buf = malloc(sizeof(char) * temp_size);
+    char *buf = calloc(temp_size, sizeof(char));
     ssize_t valread = recv(req, buf, temp_size - 1, 0);
     if(valread <= 0) {
         fprintf(stderr, "\nErro: Falha lendo mensagem\n");
@@ -473,7 +473,7 @@ SOCKET send_message(const char *msg, peer *neighbour, MSG_TYPE msg_type) {
 
 // read message, mark its sender and return the message type
 MSG_TYPE read_message(const char *buf, peer *sender) {
-    char *buf_cpy = malloc(sizeof(char) * MSG_SIZE);
+    char *buf_cpy = calloc(MSG_SIZE, sizeof(char));
     if(!buf_cpy) return UNEXPECTED_MSG_TYPE;
     strncpy(buf_cpy, buf, MSG_SIZE);
     char *tok_ip = strtok(buf_cpy, " ");

@@ -25,7 +25,7 @@ void *treat_request(void *args) {
     char *dir_path;
     get_args((listen_args *)args, &server, &peers, &peers_size, &file, &n_sock, &dir_path);
 
-    char *buf = malloc(sizeof(char) * MSG_SIZE);
+    char *buf = calloc(MSG_SIZE, sizeof(char));
 
     ssize_t valread = recv(n_sock, buf, MSG_SIZE - 1, 0);
 
