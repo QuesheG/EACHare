@@ -73,7 +73,7 @@ void *treat_request(void *args) {
         share_files_list(&server, &clock_lock, n_sock, (*peers)[i], dir_path);
         break;
     case DL:
-        send_file(&server, &clock_lock, buf, n_sock, dir_path);
+        send_file(&server, &clock_lock, buf, n_sock, (*peers)[i], dir_path);
         break;
     case BYE:
         if((*peers)[i].status == ONLINE) {

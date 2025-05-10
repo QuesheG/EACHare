@@ -244,16 +244,19 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
 
     int a, b;
     char *file_b64 = get_file_in_msg(buf, NULL, &a, &b);
-    char *file_decoded = malloc(sizeof(char) * files[f_to_down].file.fsize);
-    base64_decode(file_decoded, file_b64);
+    char *file_decoded;
+    if(file_b64) {
+        file_decoded = malloc(sizeof(char) * files[f_to_down].file.fsize);
+        base64_decode(file_decoded, file_b64);
+    }
     char *file_path = dir_file_path(dir_path, files[f_to_down].file.fname);
     FILE *new_file = fopen(file_path, "w");
-    fwrite(file_decoded, files[f_to_down].file.fsize, 1, new_file);
+    if(file_b64) fwrite(file_decoded, files[f_to_down].file.fsize, 1, new_file);
     char **temp = realloc(*files_list, sizeof(char *) * (*files_len + 1));
     if(!temp) {
         fprintf(stderr, "Erro: Falha na alocacao");
         free(file_b64);
-        free(file_decoded);
+        if(file_decoded) free(file_decoded);
         free(file_path);
         free(msg);
         fclose(new_file);
@@ -322,7 +325,7 @@ void share_files_list(peer *server, pthread_mutex_t *clock_lock, SOCKET con, pee
 
 
 //send file
-void send_file(peer *server, pthread_mutex_t *clock_lock, char *buf, SOCKET con, char *dir_path) {
+void send_file(peer *server, pthread_mutex_t *clock_lock, char *buf, SOCKET con, peer sender, char *dir_path) {
     file_msg_args *fargs = malloc(sizeof(file_msg_args));
     get_file_in_msg(buf, &(fargs->file_name), &(fargs->a), &(fargs->b));
     char *file_path = dir_file_path(dir_path, fargs->file_name);
@@ -334,6 +337,7 @@ void send_file(peer *server, pthread_mutex_t *clock_lock, char *buf, SOCKET con,
     base64_encode(encoded, file_cont, fargs->file_size);
     fargs->contentb64 = encoded;
     char *msg = build_message(server->con, server->p_clock, FILEMSG, (void *)fargs);
+    printf("\tEncaminhando mensagem \"%.*s\" para %s:%d\n", (int)strcspn(msg, "\n"), msg, inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port));
     send(con, msg, strlen(msg) + 1, 0);
     sock_close(con);
     fclose(file);
