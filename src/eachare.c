@@ -88,6 +88,7 @@ void *treat_request(void *args) {
     free(buf);
     sock_close(n_sock);
     pthread_exit(args);
+    free(args);
     return NULL;
 }
 
@@ -236,6 +237,9 @@ int main(int argc, char **argv)
     free(peers);
     free(peers_size);
     free(args);
+    for(int i = 0; i < files_len; i++) {
+        free(files[i]);
+    }
     free(files);
 #ifdef WIN
     WSACleanup();

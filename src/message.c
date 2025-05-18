@@ -317,6 +317,9 @@ void share_files_list(peer *server, pthread_mutex_t *clock_lock, SOCKET con, pee
         free(files[i]);
     }
     sock_close(con);
+    for(int i = 0; i < files_len; i++) {
+        free(files[i]);
+    }
     free(files);
     free(llargs->list_file_len);
     free(llargs);
@@ -327,7 +330,7 @@ void share_files_list(peer *server, pthread_mutex_t *clock_lock, SOCKET con, pee
 //send file
 void send_file(peer *server, pthread_mutex_t *clock_lock, char *buf, SOCKET con, peer sender, char *dir_path) {
     file_msg_args *fargs = malloc(sizeof(file_msg_args));
-    get_file_in_msg(buf, &(fargs->file_name), &(fargs->a), &(fargs->b));
+    char *a = get_file_in_msg(buf, &(fargs->file_name), &(fargs->a), &(fargs->b));
     char *file_path = dir_file_path(dir_path, fargs->file_name);
     FILE *file = fopen(file_path, "r");
     fargs->file_size = fsize(file_path);
@@ -340,7 +343,9 @@ void send_file(peer *server, pthread_mutex_t *clock_lock, char *buf, SOCKET con,
     printf("\tEncaminhando mensagem \"%.*s\" para %s:%d\n", (int)strcspn(msg, "\n"), msg, inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port));
     send_complete(con, msg, strlen(msg) + 1, 0);
     sock_close(con);
+    if(a) free(a);
     fclose(file);
+    free(file_path);
     free(fargs->file_name);
     free(encoded);
     free(fargs);
@@ -669,7 +674,7 @@ char *get_file_in_msg(const char *buf, char **fname, int *a, int *b) {
     char *infos = strtok(NULL, "\n");
     char *n = strtok(infos, " ");
     if(fname)
-        *fname = n;
+        *fname = strdup(n);
     *a = atoi(strtok(NULL, " "));
     *b = atoi(strtok(NULL, " "));
     return strtok(NULL, " ");

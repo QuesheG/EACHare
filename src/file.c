@@ -57,6 +57,7 @@ char **get_dir_files(const char *dir_path, size_t *len) {
         dirent *dir_ent = readdir(dir);
         if(!dir_ent) break;
         if(dir_ent->d_name[0] == '.') continue;
+        if(dir_ent->d_type != DT_REG) continue;
         char **temp = realloc(files, sizeof(char *) * (*len + 1));
         if(!temp) {
             for(int i = 0; i < *len; i++) {
