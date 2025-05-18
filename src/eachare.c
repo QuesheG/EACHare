@@ -45,14 +45,11 @@ void *treat_request(void *args) {
     buf[valread] = '\0';
 
     pthread_mutex_lock(&clock_lock);
-    server.p_clock = max(server.p_clock, sender.p_clock);
+    server.p_clock = max(server.p_clock, sender.p_clock) + 1;
     pthread_mutex_unlock(&clock_lock);
 
     printf("\n");
     printf("\tMensagem recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
-    pthread_mutex_lock(&clock_lock);
-    server.p_clock++;
-    pthread_mutex_unlock(&clock_lock);
     printf("\t=> Atualizando relogio para %d\n", server.p_clock);
     int i = peer_in_list(sender, *peers, *peers_size);
     if(i < 0) {

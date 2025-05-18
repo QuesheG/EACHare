@@ -166,9 +166,15 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
             buf = temp;
         }
         buf[valread] = '\0';
+
+        pthread_mutex_lock(&clock_lock);
+        server->p_clock = max(server->p_clock, sender.p_clock) + 1;
+        pthread_mutex_unlock(&clock_lock);
+        
         ls_files *temp1 = realloc(files, sizeof(ls_files) * (files_list_len + rec_files_size));
         if(!temp1 || rec_files_size == 0) {
             printf("\tResposta recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
+            printf("\t=> Atualizando relogio para %d\n", server->p_clock);
             free(buf);
             free(msg);
             sock_close(req);
@@ -176,8 +182,9 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
         }
         files = temp1;
         files_list_len += rec_files_size;
-
+        
         printf("\tResposta recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
+        printf("\t=> Atualizando relogio para %d\n", server->p_clock);
         printf("\n");
         append_files_list(buf, files, files_list_len, sender, rec_files_size);
         sock_close(req);

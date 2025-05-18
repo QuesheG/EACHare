@@ -30,6 +30,3 @@ This product includes software developed by the Apache Group for use in the Apac
 
 ## TODO:
 Requisitos EP3
-Testes
-Cheque teste do prof (obter peers -> listar peers erro)
-Falha lendo arquivos após recebimento
