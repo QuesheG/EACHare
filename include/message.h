@@ -66,6 +66,7 @@ void get_peers(peer *server, pthread_mutex_t *clock_lock, peer **peers, size_t *
 void share_peers_list(peer *server, pthread_mutex_t *clock_lock, SOCKET con, peer sender, peer *peers, size_t peers_size); // share the peers list with who requested
 void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t peers_size, char *dir_path, char ***files_list, size_t *files_len); // asks for files of all peers 
 void share_files_list(peer *server, pthread_mutex_t *clock_lock, SOCKET con, peer sender, char *dir_path); //send list of files 
+int send_complete(SOCKET sock, const void *buf, size_t len, int flag); //send full message
 void send_file(peer *server, pthread_mutex_t *clock_lock, char *buf, SOCKET con, char *dir_path); //send file
 char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *args); // create a message with the sender ip, its clock and the message type
 SOCKET send_message(const char *msg, peer *neighbour, MSG_TYPE msg_type); // send a built message to an known peer socket

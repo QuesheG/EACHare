@@ -113,7 +113,7 @@ void share_peers_list(peer *server, pthread_mutex_t *clock_lock, SOCKET soc, pee
     pthread_mutex_unlock(clock_lock);
     printf("\t=> Atualizando relogio para %d\n", server->p_clock);
     printf("\tEncaminhando mensagem \"%.*s\" para %s:%d\n", (int)strcspn(msg, "\n"), msg, inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port));
-    send(soc, msg, strlen(msg) + 1, 0);
+    send_complete(soc, msg, strlen(msg) + 1, 0);
     sock_close(soc);
     free(msg);
 }
@@ -284,7 +284,7 @@ void share_files_list(peer *server, pthread_mutex_t *clock_lock, SOCKET con, pee
         lslist_msg_args *llargs = malloc(sizeof(lslist_msg_args));
         llargs->list_len = 0;
         char *msg = build_message(server->con, server->p_clock, LS_LIST, (void *)llargs);
-        send(con, msg, strlen(msg) + 1, 0);
+        send_complete(con, msg, strlen(msg) + 1, 0);
         sock_close(con);
         printf("\tEncaminhando mensagem \"%.*s\" para %s:%d\n", (int)strcspn(msg, "\n"), msg, inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port));
         free(llargs);
@@ -308,7 +308,7 @@ void share_files_list(peer *server, pthread_mutex_t *clock_lock, SOCKET con, pee
     }
     llargs->list_len = files_len;
     char *msg = build_message(server->con, server->p_clock, LS_LIST, (void *)llargs);
-    if(send(con, msg, strlen(msg) + 1, 0))
+    if(send_complete(con, msg, strlen(msg) + 1, 0))
         printf("\tEncaminhando mensagem \"%.*s\" para %s:%d\n", (int)strcspn(msg, "\n"), msg, inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port));
     for(int i = 0; i < files_len; i++) {
         free(files[i]);
@@ -334,13 +334,13 @@ void send_file(peer *server, pthread_mutex_t *clock_lock, char *buf, SOCKET con,
     base64_encode(encoded, file_cont, fargs->file_size);
     fargs->contentb64 = encoded;
     char *msg = build_message(server->con, server->p_clock, FILEMSG, (void *)fargs);
-    send(con, msg, strlen(msg) + 1, 0);
+    send_complete(con, msg, strlen(msg) + 1, 0);
     sock_close(con);
     fclose(file);
     free(fargs->file_name);
+    free(encoded);
     free(fargs);
     free(file_cont);
-    free(encoded);
     free(msg);
 }
 
@@ -434,6 +434,18 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
 }
 
 
+//send full message
+int send_complete(SOCKET sock, const void *buf, size_t len, int flag) {
+    size_t sent = 0;
+    while(sent < len) {
+        ssize_t n = send(sock, (char*)buf + sent, len - sent, flag);
+        if(n <= 0) return -1;
+        sent += n;
+    }
+    return 0;
+}
+
+
 // send a built message to an known peer socket
 SOCKET send_message(const char *msg, peer *neighbour, MSG_TYPE msg_type) {
     if(!msg) {
@@ -454,7 +466,7 @@ SOCKET send_message(const char *msg, peer *neighbour, MSG_TYPE msg_type) {
     }
     size_t len = strlen(msg);
     printf("\tEncaminhando mensagem \"%.*s\" para %s:%d\n", (int)strcspn(msg, "\n"), msg, inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port));
-    if(send(server_soc, msg, len + 1, 0) == len + 1) {
+    if(send_complete(server_soc, msg, len + 1, 0) == 0) {
         if(neighbour->status == OFFLINE) {
             neighbour->status = ONLINE;
             printf("\tAtualizando peer %s:%d status %s\n", inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port), status_string[1]);
@@ -606,6 +618,7 @@ char *check_msg_full(const char *buf, SOCKET sock, MSG_TYPE msg_type, void *args
 
 //append list received to known list
 void append_files_list(const char *buf, ls_files *list, size_t list_len, peer sender, size_t rec_files_len) {
+    //FIXME: return only files.size > 0
     char *cpy = strdup(buf);
     strtok(cpy, " "); //ip
     strtok(NULL, " ");//clock
