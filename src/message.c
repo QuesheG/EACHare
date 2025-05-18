@@ -291,7 +291,6 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
     *files_list[*files_len] = strdup(files[f_to_down].file.fname);
     (*files_len)++;
     free(files);
-    free(file_b64);
     free(file_decoded);
     free(file_path);
     free(msg);
