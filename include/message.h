@@ -73,7 +73,7 @@ SOCKET send_message(const char *msg, peer *neighbour, MSG_TYPE msg_type); // sen
 MSG_TYPE read_message(const char *buf, peer *sender); // read message, mark its sender and return the message type
 char *check_msg_full(const char *buf, SOCKET sock, MSG_TYPE msg_type, void *args, ssize_t *valread); // check if message received was read fully
 void append_files_list(const char *buf, ls_files *list, size_t list_len, peer sender, size_t rec_files_len); //append list received to known list
-char *get_file_in_msg(const char *buf, char **fname, int *a, int *b); //return the file in base64 format
+char *get_file_in_msg(char *buf, char **fname, int *a, int *b); //return the file in base64 format
 void bye_peers(peer server, peer *peers, size_t peers_size); // send a bye message to every peer in list
 
 #endif

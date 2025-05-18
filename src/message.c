@@ -178,7 +178,7 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
     uint16_t max_fsize_size = 7;
     for(int i = 0; i < files_list_len; i++) {
         uint16_t s_f = strlen(files[i].file.fname);
-        uint16_t s_s = strlen(files[i].file.fname);
+        uint16_t s_s = (uint16_t) log10(files[i].file.fsize) + 1;
         if(s_f > max_fname_size) max_fname_size = s_f;
         if(s_s > max_fname_size) max_fsize_size = s_s;
     }
@@ -229,15 +229,26 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
         return;
     }
     size_t temp_size = MSG_SIZE + 26 + base64encode_len(files[f_to_down].file.fsize);
-    char *buf = calloc(temp_size, sizeof(char));
-    ssize_t valread = recv(req, buf, temp_size - 1, 0);
-    if(valread <= 0) {
-        fprintf(stderr, "\nErro: Falha lendo mensagem\n");
-        free(buf);
+    char *buf = calloc(temp_size + 1, sizeof(char));
+    if(!buf) {
+        fprintf(stderr, "\nErro: Falha na alocacao de recebimento!\n");
         free(msg);
+        sock_close(req);
         return;
     }
-    buf[valread] = '\0';
+    ssize_t total_received = 0;
+    while (total_received < temp_size) {
+        ssize_t valread = recv(req, buf + total_received, temp_size - total_received, 0);
+        if (valread < 0) {
+            fprintf(stderr, "Erro: Falha no recebimento\n");
+            free(buf);
+            free(msg);
+            return;
+        }
+        if(!valread) break;
+        total_received += valread;
+    }
+    buf[total_received] = '\0';
 
     printf("\n");
     printf("\tResposta recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
@@ -245,10 +256,21 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
     int a, b;
     char *file_b64 = get_file_in_msg(buf, NULL, &a, &b);
     char *file_decoded;
-    if(file_b64) {
-        file_decoded = malloc(sizeof(char) * files[f_to_down].file.fsize);
-        base64_decode(file_decoded, file_b64);
+    if(!file_b64) {
+        free(buf);
+        free(msg);
+        sock_close(req);
+        return;
     }
+    file_decoded = malloc(sizeof(char) * (files[f_to_down].file.fsize + 1));
+    if(!file_decoded) {
+        free(file_b64);
+        free(buf);
+        free(msg);
+        sock_close(req);
+        return;
+    }
+    base64_decode(file_decoded, file_b64);
     char *file_path = dir_file_path(dir_path, files[f_to_down].file.fname);
     FILE *new_file = fopen(file_path, "w");
     if(file_b64) fwrite(file_decoded, files[f_to_down].file.fsize, 1, new_file);
@@ -308,6 +330,7 @@ void share_files_list(peer *server, pthread_mutex_t *clock_lock, SOCKET con, pee
     for(size_t i = 0; i < files_len; i++) {
         char *file = dir_file_path(dir_path, files[i]);
         llargs->list_file_len[i] = fsize(file);
+        free(file);
     }
     llargs->list_len = files_len;
     char *msg = build_message(server->con, server->p_clock, LS_LIST, (void *)llargs);
@@ -317,9 +340,6 @@ void share_files_list(peer *server, pthread_mutex_t *clock_lock, SOCKET con, pee
         free(files[i]);
     }
     sock_close(con);
-    for(int i = 0; i < files_len; i++) {
-        free(files[i]);
-    }
     free(files);
     free(llargs->list_file_len);
     free(llargs);
@@ -427,7 +447,7 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
     case FILEMSG:
         ;
         file_msg_args *fargs = (file_msg_args *)args;
-        temp = realloc(msg, sizeof(char) * (msg_size_files_list(1) + fargs->file_size));
+        temp = realloc(msg, sizeof(char) * (msg_size_files_list(1) + base64encode_len(fargs->file_size)));
         if(!temp) {
             fprintf(stderr, "Erro: Falha na alocacao da mensagem!\n");
             return NULL;
@@ -666,9 +686,8 @@ void append_files_list(const char *buf, ls_files *list, size_t list_len, peer se
 
 
 //return the file in base64 format
-char *get_file_in_msg(const char *buf, char **fname, int *a, int *b) {
-    char *cpy = strdup(buf);
-    strtok(cpy, " "); //ip
+char *get_file_in_msg(char *buf, char **fname, int *a, int *b) {
+    strtok(buf, " "); //ip
     strtok(NULL, " "); //clock
     strtok(NULL, " "); //type
     char *infos = strtok(NULL, "\n");
@@ -677,7 +696,7 @@ char *get_file_in_msg(const char *buf, char **fname, int *a, int *b) {
         *fname = strdup(n);
     *a = atoi(strtok(NULL, " "));
     *b = atoi(strtok(NULL, " "));
-    return strtok(NULL, " ");
+    return strtok(NULL, "\n");
 }
 
 
