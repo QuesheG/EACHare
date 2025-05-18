@@ -98,6 +98,10 @@ char *dir_file_path(const char *dir_path, const char *file_name) {
     size_t d_path_size = strlen(dir_path);
     size_t ch_file_size = strlen(file_name);
     char *file_path = malloc(sizeof(char) * (ch_file_size + d_path_size + 2));
+    if(!file_path) {
+        fprintf(stderr, "Erro: Falha alocando caminho do arquivo\n");
+        return NULL;
+    }
     strncpy(file_path, dir_path, d_path_size);
     file_path[d_path_size] = '/';
     strncpy(file_path + d_path_size + sizeof(char), file_name, ch_file_size);
@@ -106,7 +110,7 @@ char *dir_file_path(const char *dir_path, const char *file_name) {
 }
 
 int fsize(const char *file) {
-    FILE *fp = fopen(file, "r");
+    FILE *fp = fopen(file, "rb");
     if(!fp) {
         fprintf(stderr, "Erro: Falha lendo arquivo!\n");
         return -1;
