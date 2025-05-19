@@ -7,7 +7,7 @@ EACHare é um projeto de transferência de arquivos entre peers para a matéria 
 
 - Transferência de arquivo entre peers
 
-## Instação
+## Instalação
 
 run
 ```console
