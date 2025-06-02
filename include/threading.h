@@ -14,7 +14,7 @@
 
 typedef struct listen_args
 {
-    peer server;
+    peer *server;
     peer **neighbours;
     size_t *peers_size;
     int *clock;
@@ -24,7 +24,7 @@ typedef struct listen_args
 } listen_args;
 
 void mssleep(uint64_t ms);
-listen_args *send_args(peer server, peer **neighbours, size_t *peers_size, char *file, SOCKET rec_sock, char *dir_path);
-void get_args(listen_args *l_args, peer *server, peer ***neighbours, size_t **peers_size, char **file, SOCKET *rec_sock, char **dir_path);
+listen_args *send_args(peer *server, peer **neighbours, size_t *peers_size, char *file, SOCKET rec_sock, char *dir_path);
+void get_args(listen_args *l_args, peer **server, peer ***neighbours, size_t **peers_size, char **file, SOCKET *rec_sock, char **dir_path);
 
 #endif

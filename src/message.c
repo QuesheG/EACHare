@@ -59,7 +59,7 @@ void show_peers(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t p
 
 
 // request the peers list of every known peer
-void get_peers(peer *server, pthread_mutex_t *clock_lock, peer **peers, size_t *peers_size, char *file) {
+void get_peers(peer *server, pthread_mutex_t *clock_lock, peer **peers, size_t *peers_size/*, char *file*/) {
     size_t loop_len = *peers_size;
     for(int i = 0; i < loop_len; i++) {
         pthread_mutex_lock(clock_lock);
@@ -100,7 +100,7 @@ void get_peers(peer *server, pthread_mutex_t *clock_lock, peer **peers, size_t *
 
         printf("\n");
         printf("\tResposta recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
-        append_list_peers(buf, peers, peers_size, rec_peers_size, file);
+        append_list_peers(buf, peers, peers_size, rec_peers_size/*, file*/);
         sock_close(req);
         free(msg);
     }
@@ -167,9 +167,9 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
         }
         buf[valread] = '\0';
 
-        pthread_mutex_lock(&clock_lock);
+        pthread_mutex_lock(clock_lock);
         server->p_clock = max(server->p_clock, sender.p_clock) + 1;
-        pthread_mutex_unlock(&clock_lock);
+        pthread_mutex_unlock(clock_lock);
         
         ls_files *temp1 = realloc(files, sizeof(ls_files) * (files_list_len + rec_files_size));
         if(!temp1 || rec_files_size == 0) {

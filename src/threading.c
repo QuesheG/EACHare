@@ -10,7 +10,7 @@ void mssleep(uint64_t ms) {
     #endif
 }
 
-listen_args *send_args(peer server, peer **neighbours, size_t *peers_size, char *file, SOCKET rec_sock, char *dir_path) {
+listen_args *send_args(peer *server, peer **neighbours, size_t *peers_size, char *file, SOCKET rec_sock, char *dir_path) {
     listen_args * l_args = malloc(sizeof(listen_args));
     if(!l_args) return NULL;
     l_args->server = server;
@@ -22,7 +22,7 @@ listen_args *send_args(peer server, peer **neighbours, size_t *peers_size, char 
     return l_args;
 }
 
-void get_args(listen_args *l_args, peer *server, peer ***neighbours, size_t **peers_size, char **file, SOCKET *rec_sock, char **dir_path) {
+void get_args(listen_args *l_args, peer **server, peer ***neighbours, size_t **peers_size, char **file, SOCKET *rec_sock, char **dir_path) {
     *server = l_args->server;
     *neighbours = l_args->neighbours;
     *peers_size = l_args->peers_size;

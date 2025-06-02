@@ -11,13 +11,11 @@
 #include <sock.h>
 #include <threading.h>
 
-#define max(a,b) ((a)>(b)?(a):(b))
-
 bool should_quit = false;
 pthread_mutex_t clock_lock;
 
 void *treat_request(void *args) {
-    peer server;
+    peer *server;
     peer **peers;
     size_t *peers_size;
     char *file;
@@ -45,16 +43,16 @@ void *treat_request(void *args) {
     buf[valread] = '\0';
 
     pthread_mutex_lock(&clock_lock);
-    server.p_clock = max(server.p_clock, sender.p_clock) + 1;
+    server->p_clock = max(server->p_clock, sender.p_clock) + 1;
     pthread_mutex_unlock(&clock_lock);
 
     printf("\n");
     printf("\tMensagem recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
-    printf("\t=> Atualizando relogio para %d\n", server.p_clock);
+    printf("\t=> Atualizando relogio para %d\n", server->p_clock);
     int i = peer_in_list(sender, *peers, *peers_size);
     if(i < 0) {
         sender.status = ONLINE;
-        int res = append_peer(peers, peers_size, sender, &i, file);
+        int res = append_peer(peers, peers_size, sender, &i/*, file*/);
         if(res == -1) return NULL;
     }
     if((*peers)[i].status == OFFLINE && msg_type != BYE) {
@@ -64,13 +62,13 @@ void *treat_request(void *args) {
     }
     switch(msg_type) {
     case GET_PEERS:
-        share_peers_list(&server, &clock_lock, n_sock, (*peers)[i], *peers, *peers_size);
+        share_peers_list(server, &clock_lock, n_sock, (*peers)[i], *peers, *peers_size);
         break;
     case LS:
-        share_files_list(&server, &clock_lock, n_sock, (*peers)[i], dir_path);
+        share_files_list(server, &clock_lock, n_sock, (*peers)[i], dir_path);
         break;
     case DL:
-        send_file(&server, &clock_lock, buf, n_sock, (*peers)[i], dir_path);
+        send_file(server, &clock_lock, buf, n_sock, (*peers)[i], dir_path);
         break;
     case BYE:
         if((*peers)[i].status == ONLINE) {
@@ -91,7 +89,7 @@ void *treat_request(void *args) {
 
 // routine for socket to listen to messages
 void *listen_socket(void *args) {
-    peer server;
+    peer *server;
     peer **peers;
     size_t *peers_size;
     char *file;
@@ -100,11 +98,11 @@ void *listen_socket(void *args) {
     get_args((listen_args *)args, &server, &peers, &peers_size, &file, &a, &dir_path);
 
     peer client;
-    socklen_t addrlen = sizeof(server.con);
+    socklen_t addrlen = sizeof(server->con);
 
     int opt = 1;
     SOCKET server_soc;
-    if(!create_server(&server_soc, server.con, opt)) {
+    if(!create_server(&server_soc, server->con, opt)) {
         fprintf(stderr, "\nErro: Falha com criacao de server\n");
         show_soc_error();
         return NULL;
@@ -149,7 +147,7 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    peer server;
+    peer *server = malloc(sizeof(peer));
     peer **peers = malloc(sizeof(peer *));
     int comm;
     size_t *peers_size = malloc(sizeof(size_t)), files_len = 0;
@@ -161,7 +159,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    create_address(&server, argv[1], 0);
+    create_address(server, argv[1], 0);
 
     // read file to get neighbours
     FILE *f = fopen(argv[2], "r");
@@ -201,16 +199,16 @@ int main(int argc, char **argv)
         }
         switch(comm) {
         case 1:
-            show_peers(&server, &clock_lock, *peers, *peers_size);
+            show_peers(server, &clock_lock, *peers, *peers_size);
             break;
         case 2:
-            get_peers(&server, &clock_lock, peers, peers_size, argv[2]);
+            get_peers(server, &clock_lock, peers, peers_size/*, argv[2]*/);
             break;
         case 3:
             show_files((const char **)files, files_len);
             break;
         case 4:
-            get_files(&server, &clock_lock, *peers, *peers_size, argv[3], &files, &files_len);
+            get_files(server, &clock_lock, *peers, *peers_size, argv[3], &files, &files_len);
             break;
         case 5:
             // show_statistics();
@@ -229,7 +227,8 @@ int main(int argc, char **argv)
     }
 
     pthread_mutex_destroy(&clock_lock);
-    bye_peers(server, *peers, *peers_size);
+    bye_peers(*server, *peers, *peers_size);
+    free(server);
     free(*peers);
     free(peers);
     free(peers_size);

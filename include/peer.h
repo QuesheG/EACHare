@@ -26,8 +26,8 @@ bool is_same_peer(peer a, peer b); // compare two peers
 void create_address(peer *address, const char *ip, uint32_t clock); // create an IPv4 sockaddr_in
 bool create_server(SOCKET *server, sockaddr_in address, int opt); // bind a server to the socket
 peer *create_peers(const char **peers_ip, size_t peers_size); // create peers
-int append_peer(peer **peers, size_t *peers_size, peer new_peer, int *i, char *file); // append new peer
+int append_peer(peer **peers, size_t *peers_size, peer new_peer, int *i/*, char *file*/); // append new peer
 int peer_in_list(peer a, peer *neighbours, size_t peers_size); // check if peer is in list of known peers
-void append_list_peers(const char *buf, peer **peers, size_t *peers_size, size_t rec_peers_size, char *file); // append received list to known peer list
+void append_list_peers(const char *buf, peer **peers, size_t *peers_size, size_t rec_peers_size/*, char *file*/); // append received list to known peer list
 
 #endif

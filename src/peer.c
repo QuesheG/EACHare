@@ -62,7 +62,7 @@ peer *create_peers(const char **peers_ip, size_t peers_size) {
 }
 
 // append new peer
-int append_peer(peer **peers, size_t *peers_size, peer new_peer, int *i, char *file) {
+int append_peer(peer **peers, size_t *peers_size, peer new_peer, int *i/*, char *file*/) {
     peer *new_peers = realloc(*peers, (*peers_size + 1) * sizeof(peer));
     if(!new_peers) {
         fprintf(stderr, "Erro: Falha na alocacao de new_peers");
@@ -72,10 +72,10 @@ int append_peer(peer **peers, size_t *peers_size, peer new_peer, int *i, char *f
     (*peers)[*peers_size] = new_peer;
     (*peers_size)++;
 
-    FILE *f = fopen(file, "a");
-    (*i) = *peers_size - 1;
-    fprintf(f, "%s:%d\n", inet_ntoa((*peers)[(*i)].con.sin_addr), ntohs((*peers)[(*i)].con.sin_port));
-    fclose(f);
+    // FILE *f = fopen(file, "a");
+    // (*i) = *peers_size - 1;
+    // fprintf(f, "%s:%d\n", inet_ntoa((*peers)[(*i)].con.sin_addr), ntohs((*peers)[(*i)].con.sin_port));
+    // fclose(f);
     printf("\tAdicionando novo peer %s:%d status %s\n", inet_ntoa((*peers)[(*i)].con.sin_addr), ntohs((*peers)[(*i)].con.sin_port), status_string[(*peers)[(*i)].status]);
 
     return 1;
@@ -91,7 +91,7 @@ int peer_in_list(peer a, peer *neighbours, size_t peers_size) {
 }
 
 // append received list to known peer list
-void append_list_peers(const char *buf, peer **peers, size_t *peers_size, size_t rec_peers_size, char *file) {
+void append_list_peers(const char *buf, peer **peers, size_t *peers_size, size_t rec_peers_size/*, char *file*/) {
     char *cpy = strdup(buf);
     strtok(cpy, " "); //ip
     strtok(NULL, " ");//clock
@@ -142,7 +142,7 @@ void append_list_peers(const char *buf, peer **peers, size_t *peers_size, size_t
         if(add) {
             int j;
             rec_peers_list[i].con.sin_family = AF_INET;
-            int res = append_peer(peers, peers_size, rec_peers_list[i], &j, file);
+            int res = append_peer(peers, peers_size, rec_peers_list[i], &j/*, file*/);
             if(res == -1) free(rec_peers_list);
         }
         free(cpy_l);

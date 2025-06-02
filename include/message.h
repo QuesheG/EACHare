@@ -11,6 +11,8 @@
 #define msg_size_peer_list(x) (MSG_SIZE + (x * 50)) //MSG_SIZE + (x * sizeof(255.255.255.255:655535:status:int))
 #define msg_size_files_list(x) (MSG_SIZE + (x * 300)) //MSG_SIZE + (x * sizeof(name:int)) (name => 255(linux) int 20 )
 
+#define max(a,b) ((a)>(b)?(a):(b))
+
 typedef enum _msg_type {
     UNEXPECTED_MSG_TYPE,
 
@@ -62,7 +64,7 @@ typedef struct _file_msg_args {
 
 
 void show_peers(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t peers_size); // print the peers in list
-void get_peers(peer *server, pthread_mutex_t *clock_lock, peer **peers, size_t *peers_size, char *file); // request the peers list of every known peer
+void get_peers(peer *server, pthread_mutex_t *clock_lock, peer **peers, size_t *peers_size/*, char *file*/); // request the peers list of every known peer
 void share_peers_list(peer *server, pthread_mutex_t *clock_lock, SOCKET con, peer sender, peer *peers, size_t peers_size); // share the peers list with who requested
 void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t peers_size, char *dir_path, char ***files_list, size_t *files_len); // asks for files of all peers 
 void share_files_list(peer *server, pthread_mutex_t *clock_lock, SOCKET con, peer sender, char *dir_path); //send list of files 
