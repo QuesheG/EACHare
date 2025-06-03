@@ -154,7 +154,7 @@ int main(int argc, char **argv)
     char **peers_txt, **files;
     pthread_t listener_thread;
 
-    if(!peers || !peers_size) {
+    if(!peers || !peers_size || !server) {
         fprintf(stderr, "Erro: falha na alocação de memoria\n");
         return 1;
     }

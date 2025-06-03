@@ -113,14 +113,14 @@ void share_peers_list(peer *server, pthread_mutex_t *clock_lock, SOCKET soc, pee
     args.sender = sender;
     args.peers = peers;
     args.peers_size = peers_size;
-    char *msg = build_message(server->con, server->p_clock, PEER_LIST, (void *)&args);
-    if(!msg) {
-        return;
-    }
     pthread_mutex_lock(clock_lock);
     server->p_clock++;
     pthread_mutex_unlock(clock_lock);
     printf("\t=> Atualizando relogio para %d\n", server->p_clock);
+    char *msg = build_message(server->con, server->p_clock, PEER_LIST, (void *)&args);
+    if(!msg) {
+        return;
+    }
     printf("\tEncaminhando mensagem \"%.*s\" para %s:%d\n", (int)strcspn(msg, "\n"), msg, inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port));
     send_complete(soc, msg, strlen(msg) + 1, 0);
     sock_close(soc);
