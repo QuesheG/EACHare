@@ -29,4 +29,5 @@ python testing.py
 This product includes software developed by the Apache Group for use in the Apache HTTP server project (http://www.apache.org/).
 
 ## TODO:
+Fix errs
 Requisitos EP3

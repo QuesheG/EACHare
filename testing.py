@@ -27,8 +27,12 @@ for i in range(8):
     except: pass
     for j in range(8):
         if network[i][j]:
-            with open(f_peers, "a") as file:
-                file.write("127.0.0.1:500" + str(j) + "\n")
+            if j == 0:
+                with open(f_peers, "w") as file:
+                    file.write("127.0.0.1:500" + str(j) + "\n")
+            else:
+                with open(f_peers, "a") as file:
+                    file.write("127.0.0.1:500" + str(j) + "\n")
     os.chdir("..")
 
 os.chdir("..")
@@ -38,4 +42,4 @@ for i in range(8):
         os.system("start ./testing/g0"+str(i)+"/eachare.exe 127.0.0.1:500"+str(i)+" ./testing/g0"+str(i)+"/peers.txt ./testing/g0"+str(i)+"/files")
     if platform.system() == "Linux":
         shutil.copy(os.getcwd()+"/eachare", os.getcwd()+"/testing/g0"+str(i))
-        # os.system("start ./testing/g0"+str(i)+"/eachare.exe 127.0.0.1:500"+str(i)+" ./testing/g0"+str(i)+"/peers.txt ./testing/g0"+str(i)+"/files")
+        # os.system("ptyxis -s -- sh -c ./testing/g0"+str(i)+"/eachare 127.0.0.1:500"+str(i)+" ./testing/g0"+str(i)+"/peers.txt ./testing/g0"+str(i)+"/files")

@@ -79,11 +79,11 @@ void *treat_request(void *args) {
     default:
         break;
     }
-    if(msg_type != PEER_LIST) printf(">");
     free(buf);
     sock_close(n_sock);
-    pthread_exit(args);
     free(args);
+    printf(">");
+    pthread_exit(NULL);
     return NULL;
 }
 
@@ -124,7 +124,8 @@ void *listen_socket(void *args) {
         pthread_create(&response_thread, NULL, treat_request, (void *)l_args);
     }
     sock_close(server_soc);
-    pthread_exit(args);
+    free(args);
+    pthread_exit(NULL);
     return NULL;
 }
 

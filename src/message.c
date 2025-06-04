@@ -102,6 +102,7 @@ void get_peers(peer *server, pthread_mutex_t *clock_lock, peer **peers, size_t *
         printf("\tResposta recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
         append_list_peers(buf, peers, peers_size, rec_peers_size/*, file*/);
         sock_close(req);
+        free(buf);
         free(msg);
     }
 }
@@ -170,11 +171,16 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
         pthread_mutex_lock(clock_lock);
         server->p_clock = max(server->p_clock, sender.p_clock) + 1;
         pthread_mutex_unlock(clock_lock);
-        
-        ls_files *temp1 = realloc(files, sizeof(ls_files) * (files_list_len + rec_files_size));
-        if(!temp1 || rec_files_size == 0) {
+        if(rec_files_size == 0) {
             printf("\tResposta recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
             printf("\t=> Atualizando relogio para %d\n", server->p_clock);
+            free(buf);
+            free(msg);
+            sock_close(req);
+            continue;
+        }
+        ls_files *temp1 = realloc(files, sizeof(ls_files) * (files_list_len + rec_files_size));
+        if(!temp1) {
             free(buf);
             free(msg);
             sock_close(req);
@@ -187,6 +193,7 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
         printf("\t=> Atualizando relogio para %d\n", server->p_clock);
         printf("\n");
         append_files_list(buf, files, files_list_len, sender, rec_files_size);
+        free(buf);
         sock_close(req);
         free(msg);
     }
@@ -315,6 +322,8 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
     char *n_entry = strdup(files[f_to_down].file.fname);
     if(!n_entry) {
         fprintf(stderr, "Erro: Falha ao acrescentar novo arquivo à lista\n");
+        for(int i = 0; i < files_list_len; i++)
+            free(files[i].file.fname);
         free(files);
         free(file_decoded);
         free(file_path);
@@ -324,9 +333,12 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
     }
     (*files_list)[*files_len] = n_entry;
     (*files_len)++;
+    for(int i = 0; i < files_list_len; i++)
+        free(files[i].file.fname);
     free(files);
     free(file_decoded);
     free(file_path);
+    free(args);
     fclose(new_file);
     free(buf);
 }
@@ -371,10 +383,10 @@ void share_files_list(peer *server, pthread_mutex_t *clock_lock, SOCKET con, pee
     if(msg)
         if(send_complete(con, msg, strlen(msg) + 1, 0) == 0)
             printf("\tEncaminhando mensagem \"%.*s\" para %s:%d\n", (int)strcspn(msg, "\n"), msg, inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port));
+    sock_close(con);
     for(int i = 0; i < files_len; i++) {
         free(files[i]);
     }
-    sock_close(con);
     free(files);
     free(llargs->list_file_len);
     free(llargs);
@@ -643,7 +655,7 @@ char *check_msg_full(const char *buf, SOCKET sock, MSG_TYPE msg_type, void *args
                     return NULL;
                 }
                 sprintf(aux_buf, "%s", buf);
-                *valread = recv(sock, &aux_buf[*valread], msg_size_files_list(1), 0);
+                *valread = recv(sock, &aux_buf[*valread], msg_size_files_list(1) - *valread, 0);
                 return aux_buf;
                 break;
             default:
@@ -671,7 +683,7 @@ char *check_msg_full(const char *buf, SOCKET sock, MSG_TYPE msg_type, void *args
                             char *aux_buf = calloc(new_size, sizeof(char));
                             if(!aux_buf) return NULL;
                             sprintf(aux_buf, "%s", buf);
-                            *valread += recv(sock, &(aux_buf[*valread]), new_size, 0);
+                            *valread += recv(sock, &(aux_buf[*valread]), new_size - *valread, 0);
                             return aux_buf;
                         }
                     }
@@ -751,7 +763,7 @@ char *get_file_in_msg(char *buf, char **fname, int *a, int *b) {
     strtok(NULL, " "); //type
     char *infos = strtok(NULL, "\n");
     char *n = strtok(infos, " ");
-    if(fname)
+    if(fname && n)
         *fname = strdup(n);
     *a = atoi(strtok(NULL, " "));
     *b = atoi(strtok(NULL, " "));
@@ -766,8 +778,9 @@ void bye_peers(peer server, peer *peers, size_t peers_size) {
     for(int i = 0; i < peers_size; i++) {
         if(peers[i].status == ONLINE) {
             SOCKET s = send_message(msg, &peers[i], BYE);
-            sock_close(s);
-            free(msg);
+            if(!is_invalid_sock(s))
+                sock_close(s);
         }
     }
+    free(msg);
 }

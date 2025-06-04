@@ -6,7 +6,6 @@
 #include <peer.h>
 
 char *status_string[] = { "OFFLINE", "ONLINE" };
-// TODO: array para enum de mensagens
 // TODO: make peer func && print peer func
 
 // compare two peers
@@ -72,8 +71,8 @@ int append_peer(peer **peers, size_t *peers_size, peer new_peer, int *i/*, char 
     (*peers)[*peers_size] = new_peer;
     (*peers_size)++;
 
+    (*i) = *peers_size - 1;
     // FILE *f = fopen(file, "a");
-    // (*i) = *peers_size - 1;
     // fprintf(f, "%s:%d\n", inet_ntoa((*peers)[(*i)].con.sin_addr), ntohs((*peers)[(*i)].con.sin_port));
     // fclose(f);
     printf("\tAdicionando novo peer %s:%d status %s\n", inet_ntoa((*peers)[(*i)].con.sin_addr), ntohs((*peers)[(*i)].con.sin_port), status_string[(*peers)[(*i)].status]);
@@ -140,7 +139,7 @@ void append_list_peers(const char *buf, peer **peers, size_t *peers_size, size_t
             }
         }
         if(add) {
-            int j;
+            int j = 0;
             rec_peers_list[i].con.sin_family = AF_INET;
             int res = append_peer(peers, peers_size, rec_peers_list[i], &j/*, file*/);
             if(res == -1) free(rec_peers_list);
