@@ -228,7 +228,7 @@ int main(int argc, char **argv)
     }
 
     pthread_mutex_destroy(&clock_lock);
-    bye_peers(*server, *peers, *peers_size);
+    bye_peers(server, *peers, *peers_size);
     free(server);
     free(*peers);
     free(peers);

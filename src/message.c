@@ -772,11 +772,15 @@ char *get_file_in_msg(char *buf, char **fname, int *a, int *b) {
 
 
 // send a bye message to every peer in list
-void bye_peers(peer server, peer *peers, size_t peers_size) {
-    char *msg = build_message(server.con, server.p_clock, BYE, NULL);
-    if(!msg) return;
+void bye_peers(peer *server, peer *peers, size_t peers_size) {
     for(int i = 0; i < peers_size; i++) {
         if(peers[i].status == ONLINE) {
+            pthread_mutex_lock(clock_lock);                               
+            server->p_clock++;                                            
+            pthread_mutex_unlock(clock_lock);                             
+            printf("\t=> Atualizando relogio para %d\n", server->p_clock);
+            char *msg = build_message(server->con, server->p_clock, BYE, NULL);
+            if(!msg) continue;
             SOCKET s = send_message(msg, &peers[i], BYE);
             if(!is_invalid_sock(s))
                 sock_close(s);
