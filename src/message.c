@@ -144,7 +144,8 @@ void share_peers_list(peer *server, pthread_mutex_t *clock_lock, SOCKET soc, pee
 // asks for files of all peers
 void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t peers_size, char *dir_path, char ***files_list, size_t *files_len)
 {
-    ls_files *files = NULL;
+    ls_files **files = malloc(sizeof(*files));
+    *files = NULL;
     size_t files_list_len = 0;
     for (int i = 0; i < peers_size; i++)
     {
@@ -213,7 +214,7 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
         printf("\tResposta recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
         printf("\t=> Atualizando relogio para %d\n", server->p_clock);
         printf("\n");
-        append_files_list(buf, &files, files_list_len, sender, rec_files_size);
+        append_files_list(buf, files, &files_list_len, sender, rec_files_size);
         free(buf);
         sock_close(req);
         free(msg);
@@ -222,8 +223,8 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
     uint16_t max_fsize_size = 7;
     for (int i = 0; i < files_list_len; i++)
     {
-        uint16_t s_f = strlen(files[i].file.fname);
-        uint16_t s_s = (uint16_t)log10(files[i].file.fsize) + 1;
+        uint16_t s_f = strlen((*files)[i].file.fname);
+        uint16_t s_s = (uint16_t)log10((*files)[i].file.fsize) + 1;
         if (s_f > max_fname_size)
             max_fname_size = s_f;
         if (s_s > max_fsize_size)
@@ -248,11 +249,11 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
     for (int i = 0; i < files_list_len; i++)
     {
         printf("[%0*d] ", count_size, i + 1);
-        printf("%-*s", max_fname_size, files[i].file.fname);
+        printf("%-*s", max_fname_size, (*files)[i].file.fname);
         printf(" | ");
-        printf("%-*d", max_fsize_size, (int)files[i].file.fsize);
+        printf("%-*d", max_fsize_size, (int)(*files)[i].file.fsize);
         printf(" | ");
-        printf("%s:%d\n", inet_ntoa(files[i].holders[0].con.sin_addr), ntohs(files[i].holders[0].con.sin_port));
+        printf("%s:%d\n", inet_ntoa((*files)[i].holders[0].con.sin_addr), ntohs((*files)[i].holders[0].con.sin_port));
     }
     printf("Digite o numero do arquivo para fazer o download:\n");
     int f_to_down = 0;
@@ -270,7 +271,7 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
         return;
     f_to_down--;
     dl_msg_args *args = malloc(sizeof(dl_msg_args));
-    args->fname = files[f_to_down].file.fname;
+    args->fname = (*files)[f_to_down].file.fname;
     args->chunk_size = 0;
     args->offset = 0;
     char *msg = build_message(server->con, server->p_clock, DL, (void *)args);
@@ -279,7 +280,7 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
         free(args);
         return;
     }
-    SOCKET req = send_message(msg, &(files[f_to_down].holders[0]), DL);
+    SOCKET req = send_message(msg, &((*files)[f_to_down].holders[0]), DL);
     if (is_invalid_sock(req))
     {
         fprintf(stderr, "\nErro: Falha com socket\n");
@@ -287,7 +288,7 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
         return;
     }
     free(msg);
-    size_t temp_size = MSG_SIZE + 26 + base64encode_len(files[f_to_down].file.fsize);
+    size_t temp_size = MSG_SIZE + 26 + base64encode_len((*files)[f_to_down].file.fsize);
     char *buf = calloc(temp_size + 1, sizeof(char));
     if (!buf)
     {
@@ -323,7 +324,7 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
         free(buf);
         return;
     }
-    char *file_decoded = malloc(sizeof(char) * (files[f_to_down].file.fsize + 1));
+    char *file_decoded = malloc(sizeof(char) * ((*files)[f_to_down].file.fsize + 1));
     if (!file_decoded)
     {
         fprintf(stderr, "Erro: Falha na alocacao\n");
@@ -331,14 +332,14 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
         return;
     }
     int decode_size = base64_decode(file_decoded, file_b64);
-    if (decode_size != files[f_to_down].file.fsize)
+    if (decode_size != (*files)[f_to_down].file.fsize)
     {
         fprintf(stderr, "Erro: Arquivo com tamanho diferente que esperado");
         free(file_decoded);
         free(buf);
         return;
     }
-    char *file_path = dir_file_path(dir_path, files[f_to_down].file.fname);
+    char *file_path = dir_file_path(dir_path, (*files)[f_to_down].file.fname);
     FILE *new_file = fopen(file_path, "wb");
     if (!new_file)
     {
@@ -359,13 +360,13 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
         return;
     }
     *files_list = temp;
-    char *n_entry = strdup(files[f_to_down].file.fname);
+    char *n_entry = strdup((*files)[f_to_down].file.fname);
     if (!n_entry)
     {
         fprintf(stderr, "Erro: Falha ao acrescentar novo arquivo à lista\n");
         for (int i = 0; i < files_list_len; i++)
-            free(files[i].file.fname);
-        free(files);
+            free((*files)[i].file.fname);
+        free((*files));
         free(file_decoded);
         free(file_path);
         fclose(new_file);
@@ -375,7 +376,8 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
     (*files_list)[*files_len] = n_entry;
     (*files_len)++;
     for (int i = 0; i < files_list_len; i++)
-        free(files[i].file.fname);
+        free((*files)[i].file.fname);
+    free(*files);
     free(files);
     free(file_decoded);
     free(file_path);
@@ -815,7 +817,7 @@ char *check_msg_full(const char *buf, SOCKET sock, MSG_TYPE msg_type, void *args
 }
 
 // append list received to known list
-void append_files_list(const char *buf, ls_files *list, size_t list_len, peer sender, size_t rec_files_len)
+void append_files_list(const char *buf, ls_files **list, size_t *list_len, peer sender, size_t rec_files_len)
 {
     char *cpy = strdup(buf);
     strtok(cpy, " ");  // ip
@@ -835,13 +837,13 @@ void append_files_list(const char *buf, ls_files *list, size_t list_len, peer se
 
     size_t info_count = 0;
 
-    int first_iteration = 0;
+    bool first_iteration = false;
 
-    if (!list)
+    if (!*list)
     {
-        first_iteration = 1;
-        list_len += rec_files_len;
-        list = malloc(sizeof(ls_files) * (list_len));
+        first_iteration = true;
+        *list_len += rec_files_len;
+        (*list) = malloc(sizeof(ls_files) * (*list_len));
     }
 
     for (int i = 0; i < rec_files_len; i++, info_count++)
@@ -858,21 +860,21 @@ void append_files_list(const char *buf, ls_files *list, size_t list_len, peer se
         char *infosize = strtok(NULL, "\0");
         int position;
 
-        if (first_iteration == 1)
+        if (first_iteration)
         {
             position = info_count;
-            list[position].file.fname = strdup(infoname);
-            list[position].file.fsize = atoi(infosize);
-            list[position].peers_size = 1;
+            (*list)[position].file.fname = strdup(infoname);
+            (*list)[position].file.fsize = atoi(infosize);
+            (*list)[position].peers_size = 1;
         }
         else
         {
             char *fname = strdup(infoname);
             size_t fsize = atoi(infosize);
             int repeated_index;
-            for (int j = 0; j < list_len; j++)
+            for (int j = 0; j < *list_len; j++)
             {
-                if (strcmp(fname, list[j].file.fname) == 0 && fsize == list[j].file.fsize)
+                if (strcmp(fname, (*list)[j].file.fname) == 0 && fsize == (*list)[j].file.fsize)
                 {
                     repeated_index = j;
                     position = j;
@@ -881,32 +883,32 @@ void append_files_list(const char *buf, ls_files *list, size_t list_len, peer se
             }
             if (!repeated_index)
             {
-                list_len += 1;
-                ls_files *temp1 = realloc(list, sizeof(ls_files) * (list_len));
+                *list_len += 1;
+                ls_files *temp1 = realloc((*list), sizeof(ls_files) * (*list_len));
                 if (!temp1)
                 {
                     free(fname);
                     return;
                 }
-                list = temp1;
-                position = list_len - 1;
-                list[position].file.fname = fname;
-                list[position].file.fsize = fsize;
+                (*list) = temp1;
+                position = *list_len - 1;
+                (*list)[position].file.fname = fname;
+                (*list)[position].file.fsize = fsize;
                 free(temp1);
             }
-            list[position].peers_size += 1;
+            (*list)[position].peers_size += 1;
 
             free(fname);
         }
 
-        peer *tempH = realloc(list[position].holders, sizeof(peer) * (list[position].peers_size));
+        peer *tempH = realloc((*list)[position].holders, sizeof(peer) * ((*list)[position].peers_size));
         if (!tempH)
         {
             free(cpy_l);
             return;
         }
-        list[position].holders = tempH;
-        list[position].holders[list[position].peers_size - 1] = sender;
+        (*list)[position].holders = tempH;
+        (*list)[position].holders[(*list)[position].peers_size - 1] = sender;
 
         free(tempH);
         free(cpy_l);
