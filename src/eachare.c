@@ -14,7 +14,8 @@
 bool should_quit = false;
 pthread_mutex_t clock_lock;
 
-void *treat_request(void *args) {
+void *treat_request(void *args)
+{
     peer *server;
     peer **peers;
     size_t *peers_size;
@@ -27,7 +28,8 @@ void *treat_request(void *args) {
 
     ssize_t valread = recv(n_sock, buf, MSG_SIZE - 1, 0);
 
-    if(valread <= 0 && !should_quit) {
+    if (valread <= 0 && !should_quit)
+    {
         fprintf(stderr, "\nErro: Falha lendo mensagem de vizinho\n");
         return NULL;
     }
@@ -35,7 +37,8 @@ void *treat_request(void *args) {
     peer sender;
     MSG_TYPE msg_type = read_message(buf, &sender);
     char *temp = check_msg_full(buf, n_sock, msg_type, NULL, &valread);
-    if(temp) {
+    if (temp)
+    {
         free(buf);
         buf = temp;
     }
@@ -50,17 +53,21 @@ void *treat_request(void *args) {
     printf("\tMensagem recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
     printf("\t=> Atualizando relogio para %d\n", server->p_clock);
     int i = peer_in_list(sender, *peers, *peers_size);
-    if(i < 0) {
+    if (i < 0)
+    {
         sender.status = ONLINE;
-        int res = append_peer(peers, peers_size, sender, &i/*, file*/);
-        if(res == -1) return NULL;
+        int res = append_peer(peers, peers_size, sender, &i /*, file*/);
+        if (res == -1)
+            return NULL;
     }
-    if((*peers)[i].status == OFFLINE && msg_type != BYE) {
+    if ((*peers)[i].status == OFFLINE && msg_type != BYE)
+    {
         (*peers)[i].status = ONLINE;
         printf("\tAtualizando peer %s:%d status %s\n", inet_ntoa((*peers)[i].con.sin_addr), ntohs((*peers)[i].con.sin_port), status_string[1]);
         (*peers)[i].p_clock = max((*peers)[i].p_clock, sender.p_clock);
     }
-    switch(msg_type) {
+    switch (msg_type)
+    {
     case GET_PEERS:
         share_peers_list(server, &clock_lock, n_sock, (*peers)[i], *peers, *peers_size);
         break;
@@ -71,7 +78,8 @@ void *treat_request(void *args) {
         send_file(server, &clock_lock, buf, n_sock, (*peers)[i], dir_path);
         break;
     case BYE:
-        if((*peers)[i].status == ONLINE) {
+        if ((*peers)[i].status == ONLINE)
+        {
             (*peers)[i].status = OFFLINE;
             printf("\tAtualizando peer %s:%d status %s\n", inet_ntoa((*peers)[i].con.sin_addr), ntohs((*peers)[i].con.sin_port), status_string[0]);
         }
@@ -88,7 +96,8 @@ void *treat_request(void *args) {
 }
 
 // routine for socket to listen to messages
-void *listen_socket(void *args) {
+void *listen_socket(void *args)
+{
     peer *server;
     peer **peers;
     size_t *peers_size;
@@ -102,22 +111,27 @@ void *listen_socket(void *args) {
 
     int opt = 1;
     SOCKET server_soc;
-    if(!create_server(&server_soc, server->con, opt)) {
+    if (!create_server(&server_soc, server->con, opt))
+    {
         fprintf(stderr, "\nErro: Falha com criacao de server\n");
         show_soc_error();
         return NULL;
     }
-    if(listen(server_soc, 3) != 0) {
+    if (listen(server_soc, 3) != 0)
+    {
         fprintf(stderr, "\nErro: Falha colocando socket para escutar\n");
         show_soc_error();
         return NULL;
     }
-    while(!should_quit) {
+    while (!should_quit)
+    {
         SOCKET n_sock = accept(server_soc, (struct sockaddr *)&(client.con), &addrlen);
-        if(is_invalid_sock(n_sock) && !should_quit) {
+        if (is_invalid_sock(n_sock) && !should_quit)
+        {
             fprintf(stderr, "\nErro: Falha aceitando socket de conexao\n");
         }
-        if(should_quit) return NULL;
+        if (should_quit)
+            return NULL;
 
         pthread_t response_thread;
         listen_args *l_args = send_args(server, peers, peers_size, file, n_sock, dir_path);
@@ -131,19 +145,22 @@ void *listen_socket(void *args) {
 
 int main(int argc, char **argv)
 {
-    if(argc != 4) {
+    if (argc != 4)
+    {
         fprintf(stderr, "Argumentos errados!\nEsperado: %s <endereco>:<porta> <vizinhos.txt> <diretorio_compartilhado>", argv[0]);
         return 1;
     }
 #ifdef WIN
-    if(init_win_sock()) {
+    if (init_win_sock())
+    {
         fprintf(stderr, "Erro: Falha criando socket Windows\n");
         show_soc_error();
         return 1;
     }
 #endif
 
-    if(pthread_mutex_init(&clock_lock, NULL) != 0) {
+    if (pthread_mutex_init(&clock_lock, NULL) != 0)
+    {
         perror("Erro: Falha ao inicializar o mutex");
         return EXIT_FAILURE;
     }
@@ -154,8 +171,10 @@ int main(int argc, char **argv)
     size_t *peers_size = malloc(sizeof(size_t)), files_len = 0;
     char **peers_txt, **files;
     pthread_t listener_thread;
+    int chunk_size = 256;
 
-    if(!peers || !peers_size || !server) {
+    if (!peers || !peers_size || !server)
+    {
         fprintf(stderr, "Erro: falha na alocação de memoria\n");
         return 1;
     }
@@ -164,7 +183,8 @@ int main(int argc, char **argv)
 
     // read file to get neighbours
     FILE *f = fopen(argv[2], "r");
-    if(!f) {
+    if (!f)
+    {
         fprintf(stderr, "Erro: Falha abrindo arquivo %s\n", argv[2]);
         perror(NULL);
         return 1;
@@ -172,7 +192,8 @@ int main(int argc, char **argv)
     peers_txt = read_peers(f, peers_size);
     *peers = create_peers((const char **)peers_txt, *peers_size);
     fclose(f);
-    for(int i = 0; i < *peers_size; i++) {
+    for (int i = 0; i < *peers_size; i++)
+    {
         free(peers_txt[i]);
     }
     free(peers_txt);
@@ -183,27 +204,31 @@ int main(int argc, char **argv)
     listen_args *args = send_args(server, peers, peers_size, argv[2], 0, argv[3]);
     pthread_create(&listener_thread, NULL, listen_socket, (void *)args);
 
-    while(!should_quit) {
+    while (!should_quit)
+    {
         printf("Escolha um comando:\n"
-            "\t[1] Listar peers\n"
-            "\t[2] Obter peers\n"
-            "\t[3] Listar arquivos locais\n"
-            "\t[4] Buscar arquivos\n"
-            "\t[5] Exibir estatisticas -> WIP\n"
-            "\t[6] Alterar tamanho da chunk -> WIP\n"
-            "\t[9] Sair\n");
+               "\t[1] Listar peers\n"
+               "\t[2] Obter peers\n"
+               "\t[3] Listar arquivos locais\n"
+               "\t[4] Buscar arquivos\n"
+               "\t[5] Exibir estatisticas -> WIP\n"
+               "\t[6] Alterar tamanho da chunk\n"
+               "\t[9] Sair\n");
         printf(">");
-        if(scanf("%d", &comm) != 1) {
-            while(getchar() != '\n');
+        if (scanf("%d", &comm) != 1)
+        {
+            while (getchar() != '\n')
+                ;
             printf("Comando inesperado\n");
             continue;
         }
-        switch(comm) {
+        switch (comm)
+        {
         case 1:
             show_peers(server, &clock_lock, *peers, *peers_size);
             break;
         case 2:
-            get_peers(server, &clock_lock, peers, peers_size/*, argv[2]*/);
+            get_peers(server, &clock_lock, peers, peers_size /*, argv[2]*/);
             break;
         case 3:
             show_files((const char **)files, files_len);
@@ -215,7 +240,8 @@ int main(int argc, char **argv)
             // show_statistics();
             break;
         case 6:
-            // change_chunk_size();
+            change_chunk_size(&chunk_size);
+            printf("\tTamanho de chunk alterado: %d\n", chunk_size);
             break;
         case 9:
             printf("Saindo...\n");
@@ -228,13 +254,14 @@ int main(int argc, char **argv)
     }
 
     pthread_mutex_destroy(&clock_lock);
-    bye_peers(server, *peers, *peers_size);
+    bye_peers(server, &clock_lock, *peers, *peers_size);
     free(server);
     free(*peers);
     free(peers);
     free(peers_size);
     free(args);
-    for(int i = 0; i < files_len; i++) {
+    for (int i = 0; i < files_len; i++)
+    {
         free(files[i]);
     }
     free(files);

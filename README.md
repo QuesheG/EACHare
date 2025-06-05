@@ -31,3 +31,6 @@ This product includes software developed by the Apache Group for use in the Apac
 ## TODO:
 Fix errs
 Requisitos EP3
+message.h define max for linux
+fix get_files holders
+fix append_files_list params

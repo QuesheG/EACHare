@@ -17,7 +17,6 @@ typedef struct listen_args
     peer *server;
     peer **neighbours;
     size_t *peers_size;
-    int *clock;
     char *file;
     int rec_sock;
     char *dir_path;
