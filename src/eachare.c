@@ -46,7 +46,7 @@ void *treat_request(void *args)
     buf[valread] = '\0';
 
     pthread_mutex_lock(&clock_lock);
-    server->p_clock = max(server->p_clock, sender.p_clock) + 1;
+    server->p_clock = MAX(server->p_clock, sender.p_clock) + 1;
     pthread_mutex_unlock(&clock_lock);
 
     printf("\n");
@@ -234,7 +234,7 @@ int main(int argc, char **argv)
             show_files((const char **)files, files_len);
             break;
         case 4:
-            get_files(server, &clock_lock, *peers, *peers_size, argv[3], &files, &files_len);
+            get_files(server, &clock_lock, *peers, *peers_size, argv[3], &files, &files_len, chunk_size);
             break;
         case 5:
             // show_statistics();
