@@ -244,7 +244,7 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
         printf("%-*d", max_fsize_size, (int)(*files)[i].file.fsize);
         printf(" | ");
         printf("%s:%d", inet_ntoa((*files)[i].holders[0].con.sin_addr), ntohs((*files)[i].holders[0].con.sin_port));
-        for(int j = 1; j < (*files)[i].peers_size; i++) {
+        for(int j = 1; j < (*files)[i].peers_size; j++) {
             printf(", %s:%d ", inet_ntoa((*files)[i].holders[j].con.sin_addr), ntohs((*files)[i].holders[j].con.sin_port));
         }
         printf("\n");
@@ -275,6 +275,7 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
     }
     uint64_t round = 0;
     size_t written = 0;
+    //FIXME: essa parte poderia ser paralelizada :(
     while(written < chosen_file.file.fsize) {
         for(int i = 0; i < chosen_file.peers_size; i++) {
             dl_msg_args *args = malloc(sizeof(dl_msg_args));
@@ -329,7 +330,7 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
                 return;
             }
             int decode_size = base64_decode(file_decoded, file_b64);
-            if (decode_size != chosen_file.file.fsize)
+            if (decode_size != size_chunk)
             {
                 fprintf(stderr, "Erro: Arquivo com tamanho diferente que esperado");
                 free(file_decoded);
@@ -658,6 +659,7 @@ MSG_TYPE read_message(const char *buf, peer *sender)
         tok_msg[strcspn(tok_msg, "\n")] = '\0';
     }
     create_address(sender, tok_ip, aclock);
+    
     if (strcmp(tok_msg, "HELLO") == 0)
     {
         free(buf_cpy);
