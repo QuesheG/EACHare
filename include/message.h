@@ -86,7 +86,7 @@ ArrayList *receive_files(peer *server, pthread_mutex_t *clock_lock, ArrayList *p
 void print_files_received(ArrayList *files); //print files received
 ArrayList *receive_files(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers); // download chosen file
 void append_files_list(const char *buf, ArrayList *list, peer sender, size_t rec_files_len); // append list received to known list
-char *get_file_in_msg(char *buf, char **fname, int *chunk_size, int *offset); // return the file in base64 format
+char *get_file_in_msg(char *buf, int *clock, char **fname, int *chunk_size, int *offset); // return the file in base64 format
 void change_chunk_size(int *chunk_size); // change the local chunk_size
 void bye_peers(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers); // send a bye message to every peer in list
 

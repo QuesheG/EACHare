@@ -255,7 +255,8 @@ void send_file(peer *server, pthread_mutex_t *clock_lock, char *buf, SOCKET con,
     file_msg_args *fargs = malloc(sizeof(file_msg_args));
     if (!fargs)
         return;
-    char *a = get_file_in_msg(buf, &(fargs->file_name), &(fargs->chunk_size), &(fargs->offset));
+    int clock = 0;
+    char *a = get_file_in_msg(buf, &clock, &(fargs->file_name), &(fargs->chunk_size), &(fargs->offset));
     if (a)
         free(a);
     char *file_path = dir_file_path(dir_path, fargs->file_name);
@@ -754,16 +755,21 @@ void download_file(peer *server, pthread_mutex_t *clock_lock, ls_files chosen_fi
                     return;
                 }
                 if(!valread)
-                    break;
+                break;
                 total_received += valread;
             }
             buf[total_received] = 0;
-
+            
             printf("\n");
             printf("\nResposta recebida:  \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
-
+            
             int sent_chunk, offset;
-            char *file_b64 = get_file_in_msg(buf, NULL, &sent_chunk, &offset);
+            int clock = 0;
+            char *file_b64 = get_file_in_msg(buf, &clock, NULL, &sent_chunk, &offset);
+            pthread_mutex_lock(clock_lock);
+            server->p_clock = MAX(server->p_clock, clock) + 1;
+            pthread_mutex_unlock(clock_lock);
+            printf("\t=> Atualizando relogio para %d\n", server->p_clock);
             if(!file_b64) {
                 fprintf(stderr, "Erro: Falha no recebimento do arquivo\n");
                 free(buf);
@@ -776,13 +782,6 @@ void download_file(peer *server, pthread_mutex_t *clock_lock, ls_files chosen_fi
                 return;
             }
             int decode_size = base64_decode(file_decoded, file_b64);
-            if (decode_size != size_chunk)
-            {
-                fprintf(stderr, "Erro: Arquivo com tamanho diferente que esperado");
-                free(file_decoded);
-                free(buf);
-                return;
-            }
             written += fwrite(file_decoded, 1, decode_size, new_file);
             free(file_decoded);
             free(buf);
@@ -875,10 +874,10 @@ void append_files_list(const char *buf, ArrayList *list, peer sender, size_t rec
 }
 
 // return the file in base64 format
-char *get_file_in_msg(char *buf, char **fname, int *chunk_size, int *offset)
+char *get_file_in_msg(char *buf, int *clock, char **fname, int *chunk_size, int *offset)
 {
     strtok(buf, " ");  // ip
-    strtok(NULL, " "); // clock
+    *clock = atoi(strtok(NULL, " ")); // clock
     strtok(NULL, " "); // type
     char *infos = strtok(NULL, "\n");
     char *n = strtok(infos, " ");
