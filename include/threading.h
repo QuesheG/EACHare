@@ -9,21 +9,21 @@
 #include <stdint.h>
 #include <dirent.h>
 #include <pthread.h>
+#include <list.h>
 #include <peer.h>
 #include <sock.h>
 
 typedef struct listen_args
 {
     peer *server;
-    peer **neighbours;
-    size_t *peers_size;
-    char *file;
+    ArrayList *neighbours;
+    // char *file;
     int rec_sock;
     char *dir_path;
 } listen_args;
 
 void mssleep(uint64_t ms);
-listen_args *send_args(peer *server, peer **neighbours, size_t *peers_size, char *file, SOCKET rec_sock, char *dir_path);
-void get_args(listen_args *l_args, peer **server, peer ***neighbours, size_t **peers_size, char **file, SOCKET *rec_sock, char **dir_path);
+listen_args *send_args(peer *server, ArrayList *neighbours, /*char *file, */SOCKET rec_sock, char *dir_path);
+void get_args(listen_args *l_args, peer **server, ArrayList **neighbours, /*char **file,*/ SOCKET *rec_sock, char **dir_path);
 
 #endif

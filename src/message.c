@@ -12,15 +12,15 @@
 char *message_string[] = {"UNEXPECTED_MSG_TYPE", "HELLO", "GET_PEERS", "PEER_LIST", "LS", "LS_LIST", "DL", "FILE", "BYE"};
 
 // print the peers in list
-void show_peers(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t peers_size)
+void show_peers(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers)
 {
     printf("Lista de peers:\n");
     printf("\t[0] voltar para o menu anterior\n");
 
-    for (int i = 0; i < peers_size; i++)
+    for (int i = 0; i < peers->count; i++)
     {
-        printf("\t[%d] %s:%u ", i + 1, inet_ntoa(peers[i].con.sin_addr), ntohs(peers[i].con.sin_port));
-        if (peers[i].status == ONLINE)
+        printf("\t[%d] %s:%u ", i + 1, inet_ntoa(((peer*)peers->elements)[i].con.sin_addr), ntohs(((peer*)peers->elements)[i].con.sin_port));
+        if (((peer*)peers->elements)[i].status == ONLINE)
             printf("%s\n", status_string[1]);
         else
             printf("%s\n", status_string[0]);
@@ -38,7 +38,7 @@ void show_peers(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t p
     }
     else if (input == 0)
         return;
-    else if (input > 0 && input <= peers_size)
+    else if (input > 0 && input <= peers->count)
     {
         pthread_mutex_lock(clock_lock);
         server->p_clock++;
@@ -53,7 +53,7 @@ void show_peers(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t p
             fprintf(stderr, "Erro: Falha na construcao da mensagem!\n");
             return;
         }
-        SOCKET s = send_message(msg, &(peers[input - 1]), HELLO);
+        SOCKET s = send_message(msg, &(((peer*)peers->elements)[input - 1]), HELLO);
         sock_close(s);
         free(msg);
     }
@@ -65,9 +65,9 @@ void show_peers(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t p
 }
 
 // request the peers list of every known peer
-void get_peers(peer *server, pthread_mutex_t *clock_lock, peer **peers, size_t *peers_size /*, char *file*/)
+void get_peers(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers /*, char *file*/)
 {
-    size_t loop_len = *peers_size;
+    size_t loop_len = peers->count;
     for (int i = 0; i < loop_len; i++)
     {
         pthread_mutex_lock(clock_lock);
@@ -83,7 +83,7 @@ void get_peers(peer *server, pthread_mutex_t *clock_lock, peer **peers, size_t *
             perror("Erro: Falha na construcao da mensagem!\n");
             return;
         }
-        SOCKET req = send_message(msg, &((*peers)[i]), GET_PEERS);
+        SOCKET req = send_message(msg, &(((peer*)peers->elements)[i]), GET_PEERS);
         if (is_invalid_sock(req))
         {
             free(msg);
@@ -112,7 +112,7 @@ void get_peers(peer *server, pthread_mutex_t *clock_lock, peer **peers, size_t *
 
         printf("\n");
         printf("\tResposta recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
-        append_list_peers(buf, peers, peers_size, rec_peers_size /*, file*/);
+        append_list_peers(buf, peers, rec_peers_size /*, file*/);
         sock_close(req);
         free(buf);
         free(msg);
@@ -120,12 +120,12 @@ void get_peers(peer *server, pthread_mutex_t *clock_lock, peer **peers, size_t *
 }
 
 // share the peers list with who requested
-void share_peers_list(peer *server, pthread_mutex_t *clock_lock, SOCKET soc, peer sender, peer *peers, size_t peers_size)
+void share_peers_list(peer *server, pthread_mutex_t *clock_lock, SOCKET soc, peer sender, ArrayList *peers)
 {
     peer_list_args args;
     args.sender = sender;
     args.peers = peers;
-    args.peers_size = peers_size;
+    args.peers_size = peers->count;
     pthread_mutex_lock(clock_lock);
     server->p_clock++;
     pthread_mutex_unlock(clock_lock);
@@ -142,113 +142,10 @@ void share_peers_list(peer *server, pthread_mutex_t *clock_lock, SOCKET soc, pee
 }
 
 // asks for files of all peers
-void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t peers_size, char *dir_path, char ***files_list, size_t *files_len, int size_chunk)
+void get_files(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers, char *dir_path, ArrayList *files_list, int size_chunk)
 {
-    ls_files **files = malloc(sizeof(*files));
-    *files = NULL;
-    size_t files_list_len = 0;
-    for (int i = 0; i < peers_size; i++)
-    {
-        if (peers[i].status == OFFLINE)
-            continue;
-        pthread_mutex_lock(clock_lock);
-        server->p_clock++;
-        pthread_mutex_unlock(clock_lock);
-        printf("\t=> Atualizando relogio para %d\n", server->p_clock);
-        char *msg = build_message(server->con, server->p_clock, LS, NULL);
-        if (!msg)
-        {
-            perror("Erro: Falha na construcao da mensagem!\n");
-            return;
-        }
-        SOCKET req = send_message(msg, &(peers[i]), LS);
-        if (is_invalid_sock(req))
-        {
-            free(msg);
-            continue;
-        }
-        char *buf = calloc(MSG_SIZE, sizeof(char));
-        ssize_t valread = recv(req, buf, MSG_SIZE - 1, 0);
-        if (valread <= 0)
-        {
-            fprintf(stderr, "\nErro: Falha lendo mensagem\n");
-            free(buf);
-            free(msg);
-            continue;
-        }
-        peer sender;
-        MSG_TYPE msg_type = read_message(buf, &sender);
-
-        size_t rec_files_size = 0;
-        char *temp = check_msg_full(buf, req, msg_type, (void *)&rec_files_size, &valread);
-        if (temp)
-        {
-            free(buf);
-            buf = temp;
-        }
-        buf[valread] = '\0';
-
-        pthread_mutex_lock(clock_lock);
-        server->p_clock = MAX(server->p_clock, sender.p_clock) + 1;
-        pthread_mutex_unlock(clock_lock);
-        if (rec_files_size == 0)
-        {
-            printf("\tResposta recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
-            printf("\t=> Atualizando relogio para %d\n", server->p_clock);
-            free(buf);
-            free(msg);
-            sock_close(req);
-            continue;
-        }
-
-        printf("\tResposta recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
-        printf("\t=> Atualizando relogio para %d\n", server->p_clock);
-        printf("\n");
-        append_files_list(buf, files, &files_list_len, sender, rec_files_size);
-        free(buf);
-        sock_close(req);
-        free(msg);
-    }
-    uint16_t max_fname_size = 10;
-    uint16_t max_fsize_size = 7;
-    for (int i = 0; i < files_list_len; i++)
-    {
-        uint16_t s_f = strlen((*files)[i].file.fname);
-        uint16_t s_s = (uint16_t)log10((*files)[i].file.fsize) + 1;
-        if (s_f > max_fname_size)
-            max_fname_size = s_f;
-        if (s_s > max_fsize_size)
-            max_fsize_size = s_s;
-    }
-    uint16_t count_size = floor(log10(files_list_len)) + 1;
-    // print header
-    printf("%*.s ", count_size + 2, "");
-    printf("%-*s ", max_fname_size, "Nome");
-    printf("|");
-    printf(" %-*s ", max_fsize_size, "Tamanho");
-    printf("|");
-    printf(" %s\n", "Peer");
-    // print cancel
-    printf("[%0*d] ", count_size, 0);
-    printf("%-*s ", max_fname_size, "<Cancelar>");
-    printf("|");
-    printf(" %*.s ", max_fsize_size, "");
-    printf("|");
-    printf("\n");
-    // print list
-    for (int i = 0; i < files_list_len; i++)
-    {
-        printf("[%0*d] ", count_size, i + 1);
-        printf("%-*s", max_fname_size, (*files)[i].file.fname);
-        printf(" | ");
-        printf("%-*d", max_fsize_size, (int)(*files)[i].file.fsize);
-        printf(" | ");
-        printf("%s:%d", inet_ntoa((*files)[i].holders[0].con.sin_addr), ntohs((*files)[i].holders[0].con.sin_port));
-        for(int j = 1; j < (*files)[i].peers_size; j++) {
-            printf(", %s:%d ", inet_ntoa((*files)[i].holders[j].con.sin_addr), ntohs((*files)[i].holders[j].con.sin_port));
-        }
-        printf("\n");
-    }
+    ArrayList *files = receive_files(server, clock_lock, peers);
+    print_files_received(files);
     printf("Digite o numero do arquivo para fazer o download:\n");
     int f_to_down = 0;
     printf(">");
@@ -261,113 +158,37 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
     }
     if (!f_to_down)
         return;
-    if (f_to_down > files_list_len)
+    if (f_to_down > files->count)
         return;
     f_to_down--;
     
     
-    ls_files chosen_file = (*files)[f_to_down];
+    ls_files chosen_file = ((ls_files*)files->elements)[f_to_down];
+    ArrayList *holders = ((ls_files*)files->elements)[f_to_down].holders;
     char *file_path = dir_file_path(dir_path, chosen_file.file.fname);
     FILE *new_file = fopen(file_path, "wb");
     if(!new_file) {
         fprintf(stderr, "Erro: Falha abrindo arquivo");
         return;
     }
-    uint64_t round = 0;
-    size_t written = 0;
-    //FIXME: essa parte poderia ser paralelizada :(
-    while(written < chosen_file.file.fsize) {
-        for(int i = 0; i < chosen_file.peers_size; i++) {
-            dl_msg_args *args = malloc(sizeof(dl_msg_args));
-            args->fname = chosen_file.file.fname;
-            args->chunk_size = size_chunk;
-            args->offset = i + (round * chosen_file.peers_size);
-            char *msg = build_message(server->con, server->p_clock, DL, (void *)args);
-            free(args);
-            if(!msg) return;
-            SOCKET req = send_message(msg, &(chosen_file.holders[i]), DL);
-            if(is_invalid_sock(req)) {
-                fprintf(stderr, "\nErro: Falha com socket\n");
-                free(msg);
-                return;
-            }
-            free(msg);
-            size_t temp_size = MSG_SIZE + 26 + base64encode_len(size_chunk);
-            char *buf = calloc(temp_size + 1, sizeof(char));
-            if(!buf) {
-                fprintf(stderr, "\nErro: Falha na alocacao de recebimento!\n");
-                sock_close(req);
-                return;
-            }
-            ssize_t total_received = 0;
-            while(total_received < temp_size) {
-                ssize_t valread = recv(req, buf + total_received, temp_size - total_received, 0);
-                if(valread < 0) {
-                    fprintf(stderr, "\nErro: Falha no recebimento\n");
-                    free(buf);
-                    return;
-                }
-                if(!valread)
-                    break;
-                total_received += valread;
-            }
-            buf[total_received] = 0;
+    
+    download_file(server, clock_lock, chosen_file, holders, size_chunk, new_file);
 
-            printf("\n");
-            printf("\nResposta recebida:  \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
-
-            int sent_chunk, offset;
-            char *file_b64 = get_file_in_msg(buf, NULL, &sent_chunk, &offset);
-            if(!file_b64) {
-                fprintf(stderr, "Erro: Falha no recebimento do arquivo\n");
-                free(buf);
-                return;
-            }
-            char *file_decoded = malloc(sizeof(char) * (size_chunk + 1));
-            if(!file_decoded) {
-                fprintf(stderr, "Erro: Falha na alocacao\n");
-                free(buf);
-                return;
-            }
-            int decode_size = base64_decode(file_decoded, file_b64);
-            if (decode_size != size_chunk)
-            {
-                fprintf(stderr, "Erro: Arquivo com tamanho diferente que esperado");
-                free(file_decoded);
-                free(buf);
-                return;
-            }
-            written += fwrite(file_decoded, 1, decode_size, new_file);
-            free(file_decoded);
-            free(buf);
-        }
-        round++;
-    }
-    char **temp = realloc(*files_list, sizeof(char *) * (*files_len + 1));
-    if (!temp)
-    {
-        fprintf(stderr, "Erro: Falha na alocacao");
-        free(file_path);
-        fclose(new_file);
-        return;
-    }
-    *files_list = temp;
     char *n_entry = strdup(chosen_file.file.fname);
     if (!n_entry)
     {
         fprintf(stderr, "Erro: Falha ao acrescentar novo arquivo à lista\n");
-        for (int i = 0; i < files_list_len; i++)
-            free((*files)[i].file.fname);
-        free((*files));
+        for (int i = 0; i < files->count; i++)
+            free(((ls_files*)files->elements)[i].file.fname);
+        free(((ls_files*)files->elements));
         free(file_path);
         fclose(new_file);
         return;
     }
-    (*files_list)[*files_len] = n_entry;
-    (*files_len)++;
-    for (int i = 0; i < files_list_len; i++)
-        free((*files)[i].file.fname);
-    free(*files);
+    append_element(files_list, (void*)&n_entry);
+    for (int i = 0; i < files->count; i++)
+        free(((ls_files*)files->elements)[i].file.fname);
+    free_list(files);
     free(files);
     free(file_path);
     fclose(new_file);
@@ -659,48 +480,25 @@ MSG_TYPE read_message(const char *buf, peer *sender)
         tok_msg[strcspn(tok_msg, "\n")] = '\0';
     }
     create_address(sender, tok_ip, aclock);
-    
+    MSG_TYPE ret_msg_type = UNEXPECTED_MSG_TYPE;
     if (strcmp(tok_msg, "HELLO") == 0)
-    {
-        free(buf_cpy);
-        return HELLO;
-    }
+        ret_msg_type = HELLO;
     if (strcmp(tok_msg, "GET_PEERS") == 0)
-    {
-        free(buf_cpy);
-        return GET_PEERS;
-    }
+        ret_msg_type = GET_PEERS;
     if (strcmp(tok_msg, "PEER_LIST") == 0)
-    {
-        free(buf_cpy);
-        return PEER_LIST;
-    }
+        ret_msg_type = PEER_LIST;
     if (strcmp(tok_msg, "LS") == 0)
-    {
-        free(buf_cpy);
-        return LS;
-    }
+        ret_msg_type = LS;
     if (strcmp(tok_msg, "LS_LIST") == 0)
-    {
-        free(buf_cpy);
-        return LS_LIST;
-    }
+        ret_msg_type = LS_LIST;
     if (strcmp(tok_msg, "DL") == 0)
-    {
-        free(buf_cpy);
-        return DL;
-    }
+        ret_msg_type = DL;
     if (strcmp(tok_msg, "FILE") == 0)
-    {
-        free(buf_cpy);
-        return FILEMSG;
-    }
+        ret_msg_type = FILEMSG;
     if (strcmp(tok_msg, "BYE") == 0)
-    {
-        free(buf_cpy);
-        return BYE;
-    }
-    return UNEXPECTED_MSG_TYPE;
+        ret_msg_type = BYE;
+    free(buf_cpy);
+    return ret_msg_type;
 }
 
 // check if message received was read fully
@@ -805,8 +603,196 @@ char *check_msg_full(const char *buf, SOCKET sock, MSG_TYPE msg_type, void *args
     return NULL;
 }
 
+ArrayList *receive_files(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers) {
+    ArrayList *files = alloc_list(sizeof(ls_files*));
+    
+    for (int i = 0; i < peers->count; i++)
+    {
+        if (((peer*)peers->elements)[i].status == OFFLINE)
+            continue;
+        pthread_mutex_lock(clock_lock);
+        server->p_clock++;
+        pthread_mutex_unlock(clock_lock);
+        printf("\t=> Atualizando relogio para %d\n", server->p_clock);
+        char *msg = build_message(server->con, server->p_clock, LS, NULL);
+        if (!msg)
+        {
+            perror("Erro: Falha na construcao da mensagem!\n");
+            return;
+        }
+        SOCKET req = send_message(msg, &(((peer*)peers->elements)[i]), LS);
+        if (is_invalid_sock(req))
+        {
+            free(msg);
+            continue;
+        }
+        char *buf = calloc(MSG_SIZE, sizeof(char));
+        ssize_t valread = recv(req, buf, MSG_SIZE - 1, 0);
+        if (valread <= 0)
+        {
+            fprintf(stderr, "\nErro: Falha lendo mensagem\n");
+            free(buf);
+            free(msg);
+            continue;
+        }
+        peer sender;
+        MSG_TYPE msg_type = read_message(buf, &sender);
+
+        size_t rec_files_size = 0;
+        char *temp = check_msg_full(buf, req, msg_type, (void *)&rec_files_size, &valread);
+        if (temp)
+        {
+            free(buf);
+            buf = temp;
+        }
+        buf[valread] = '\0';
+
+        pthread_mutex_lock(clock_lock);
+        server->p_clock = MAX(server->p_clock, sender.p_clock) + 1;
+        pthread_mutex_unlock(clock_lock);
+        if (rec_files_size == 0)
+        {
+            printf("\tResposta recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
+            printf("\t=> Atualizando relogio para %d\n", server->p_clock);
+            free(buf);
+            free(msg);
+            sock_close(req);
+            continue;
+        }
+
+        printf("\tResposta recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
+        printf("\t=> Atualizando relogio para %d\n", server->p_clock);
+        printf("\n");
+        append_files_list(buf, files, sender, rec_files_size);
+        free(buf);
+        sock_close(req);
+        free(msg);
+    }
+}
+
+void print_files_received(ArrayList *files) {
+    if(!files || files->size_elements != sizeof(ls_files)) return; //FIXME: treat
+    uint16_t max_fname_size = 10;
+    uint16_t max_fsize_size = 7;
+    for (int i = 0; i < files->count; i++)
+    {
+        uint16_t s_f = strlen(((ls_files*)files->elements)[i].file.fname);
+        uint16_t s_s = (uint16_t)log10(((ls_files*)files->elements)[i].file.fsize) + 1;
+        if (s_f > max_fname_size)
+            max_fname_size = s_f;
+        if (s_s > max_fsize_size)
+            max_fsize_size = s_s;
+    }
+    uint16_t count_size = floor(log10(files->count)) + 1;
+    // print header
+    printf("%*.s ", count_size + 2, "");
+    printf("%-*s ", max_fname_size, "Nome");
+    printf("|");
+    printf(" %-*s ", max_fsize_size, "Tamanho");
+    printf("|");
+    printf(" %s\n", "Peer");
+    // print cancel
+    printf("[%0*d] ", count_size, 0);
+    printf("%-*s ", max_fname_size, "<Cancelar>");
+    printf("|");
+    printf(" %*.s ", max_fsize_size, "");
+    printf("|");
+    printf("\n");
+    // print list
+    for (int i = 0; i < files->count; i++)
+    {
+        printf("[%0*d] ", count_size, i + 1);
+        printf("%-*s", max_fname_size, ((ls_files*)files->elements)[i].file.fname);
+        printf(" | ");
+        printf("%-*d", max_fsize_size, (int)((ls_files*)files->elements)[i].file.fsize);
+        printf(" | ");
+        printf("%s:%d", inet_ntoa(((peer*)((ls_files*)files->elements)[i].holders)[0].con.sin_addr), ntohs(((peer*)((ls_files*)files->elements)[i].holders)[0].con.sin_port));
+        for(int j = 1; j < ((ls_files*)files->elements)[i].peers_size; j++) {
+            printf(", %s:%d ", inet_ntoa(((peer*)((ls_files*)files->elements)[i].holders)[j].con.sin_addr), ntohs(((peer*)((ls_files*)files->elements)[i].holders)[j].con.sin_port));
+        }
+        printf("\n");
+    }
+}
+
+void download_file(peer *server, pthread_mutex_t *clock_lock, ls_files chosen_file, ArrayList *holders, size_t size_chunk, FILE *new_file) {
+    uint64_t round = 0;
+    size_t written = 0;
+    //FIXME: essa parte poderia ser paralelizada :(
+    while(written < chosen_file.file.fsize) {
+        for(int i = 0; i < chosen_file.peers_size; i++) {
+            dl_msg_args *args = malloc(sizeof(dl_msg_args));
+            args->fname = chosen_file.file.fname;
+            args->chunk_size = size_chunk;
+            args->offset = i + (round * chosen_file.peers_size);
+            pthread_mutex_lock(clock_lock);
+            server->p_clock++;
+            pthread_mutex_unlock(clock_lock);
+            printf("\t=> Atualizando relogio para %d\n", server->p_clock);
+            char *msg = build_message(server->con, server->p_clock, DL, (void *)args);
+            free(args);
+            if(!msg) return;
+            SOCKET req = send_message(msg, &(((peer*)holders->elements)[i]), DL);
+            if(is_invalid_sock(req)) {
+                fprintf(stderr, "\nErro: Falha com socket\n");
+                free(msg);
+                return;
+            }
+            free(msg);
+            size_t temp_size = MSG_SIZE + 26 + base64encode_len(size_chunk);
+            char *buf = calloc(temp_size + 1, sizeof(char));
+            if(!buf) {
+                fprintf(stderr, "\nErro: Falha na alocacao de recebimento!\n");
+                sock_close(req);
+                return;
+            }
+            ssize_t total_received = 0;
+            while(total_received < temp_size) {
+                ssize_t valread = recv(req, buf + total_received, temp_size - total_received, 0);
+                if(valread < 0) {
+                    fprintf(stderr, "\nErro: Falha no recebimento\n");
+                    free(buf);
+                    return;
+                }
+                if(!valread)
+                    break;
+                total_received += valread;
+            }
+            buf[total_received] = 0;
+
+            printf("\n");
+            printf("\nResposta recebida:  \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
+
+            int sent_chunk, offset;
+            char *file_b64 = get_file_in_msg(buf, NULL, &sent_chunk, &offset);
+            if(!file_b64) {
+                fprintf(stderr, "Erro: Falha no recebimento do arquivo\n");
+                free(buf);
+                return;
+            }
+            char *file_decoded = malloc(sizeof(char) * (size_chunk + 1));
+            if(!file_decoded) {
+                fprintf(stderr, "Erro: Falha na alocacao\n");
+                free(buf);
+                return;
+            }
+            int decode_size = base64_decode(file_decoded, file_b64);
+            if (decode_size != size_chunk)
+            {
+                fprintf(stderr, "Erro: Arquivo com tamanho diferente que esperado");
+                free(file_decoded);
+                free(buf);
+                return;
+            }
+            written += fwrite(file_decoded, 1, decode_size, new_file);
+            free(file_decoded);
+            free(buf);
+        }
+        round++;
+    }
+}
+
 // append list received to known list
-void append_files_list(const char *buf, ls_files **list, size_t *list_len, peer sender, size_t rec_files_len)
+void append_files_list(const char *buf, ArrayList *list, peer sender, size_t rec_files_len)
 {
     char *cpy = strdup(buf);
     strtok(cpy, " ");  // ip
@@ -828,12 +814,8 @@ void append_files_list(const char *buf, ls_files **list, size_t *list_len, peer 
 
     bool first_iteration = false;
 
-    if (!*list)
-    {
+    if (is_list_empty(*list))
         first_iteration = true;
-        *list_len += rec_files_len;
-        (*list) = malloc(sizeof(ls_files) * (*list_len));
-    }
 
     for (int i = 0; i < rec_files_len; i++, info_count++)
     {
@@ -852,18 +834,23 @@ void append_files_list(const char *buf, ls_files **list, size_t *list_len, peer 
         if (first_iteration)
         {
             position = info_count;
-            (*list)[position].file.fname = strdup(infoname);
-            (*list)[position].file.fsize = atoi(infosize);
-            (*list)[position].peers_size = 1;
+            ls_files a = {0};
+            a.file.fname = strdup(infoname);
+            a.file.fsize = atoi(infosize);
+            a.peers_size = 1;
+            ls_files *b = malloc(sizeof(ls_files));
+            *b = a;
+            b->holders = alloc_list(sizeof(peer));
+            append_element(list, (void*)&b);
         }
         else
         {
             char *fname = strdup(infoname);
             size_t fsize = atoi(infosize);
             int repeated_index;
-            for (int j = 0; j < *list_len; j++)
+            for (int j = 0; j < list->count; j++)
             {
-                if (strcmp(fname, (*list)[j].file.fname) == 0 && fsize == (*list)[j].file.fsize)
+                if (strcmp(fname, ((ls_files*)list->elements)[j].file.fname) == 0 && fsize == ((ls_files*)list->elements)[j].file.fsize)
                 {
                     repeated_index = j;
                     position = j;
@@ -872,34 +859,15 @@ void append_files_list(const char *buf, ls_files **list, size_t *list_len, peer 
             }
             if (!repeated_index)
             {
-                *list_len += 1;
-                ls_files *temp1 = realloc((*list), sizeof(ls_files) * (*list_len));
-                if (!temp1)
-                {
-                    free(fname);
-                    return;
-                }
-                (*list) = temp1;
-                position = *list_len - 1;
-                (*list)[position].file.fname = fname;
-                (*list)[position].file.fsize = fsize;
-                free(temp1);
+                ls_files a = {0};
+                a.file.fname = fname;
+                a.file.fsize = fsize;
+                append_element(list, (void*)&a);
             }
-            (*list)[position].peers_size += 1;
-
-            free(fname);
+            ((ls_files*)list->elements)[position].peers_size++;
         }
+        append_element(((ls_files*)list->elements)[position].holders, &sender);
 
-        peer *tempH = realloc((*list)[position].holders, sizeof(peer) * ((*list)[position].peers_size));
-        if (!tempH)
-        {
-            free(cpy_l);
-            return;
-        }
-        (*list)[position].holders = tempH;
-        (*list)[position].holders[(*list)[position].peers_size - 1] = sender;
-
-        free(tempH);
         free(cpy_l);
     }
 
@@ -945,11 +913,11 @@ void change_chunk_size(int *chunk_size)
 }
 
 // send a bye message to every peer in list
-void bye_peers(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t peers_size)
+void bye_peers(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers)
 {
-    for (int i = 0; i < peers_size; i++)
+    for (int i = 0; i < peers->count; i++)
     {
-        if (peers[i].status == ONLINE)
+        if (((peer*)peers->elements)[i].status == ONLINE)
         {
             pthread_mutex_lock(clock_lock);
             server->p_clock++;
@@ -958,7 +926,7 @@ void bye_peers(peer *server, pthread_mutex_t *clock_lock, peer *peers, size_t pe
             char *msg = build_message(server->con, server->p_clock, BYE, NULL);
             if (!msg)
                 continue;
-            SOCKET s = send_message(msg, &peers[i], BYE);
+            SOCKET s = send_message(msg, &((peer*)peers->elements)[i], BYE);
             if (!is_invalid_sock(s))
                 sock_close(s);
             free(msg);

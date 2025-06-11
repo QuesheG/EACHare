@@ -84,13 +84,13 @@ char **get_dir_files(const char *dir_path, size_t *len) {
 }
 
 //list filenames in memory
-void show_files(const char **files, size_t file_len) {
-    if(file_len <= 0) {
+void show_files(ArrayList *files) {
+    if(files->count <= 0) {
         printf("Nao foi possivel encontrar arquivos\n");
         return;
     }
-    for(int i = 0; i < file_len; i++) {
-        printf("  %s\n", files[i]);
+    for(int i = 0; i < files->count; i++) {
+        printf("  %s\n", ((char**)files->elements)[i]);
     }
 }
 

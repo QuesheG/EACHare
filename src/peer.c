@@ -47,35 +47,23 @@ bool create_server(SOCKET *server, sockaddr_in address, int opt) {
 }
 
 // create peers
-peer *create_peers(const char **peers_ip, size_t peers_size) {
-    peer *peers = malloc(sizeof(peer) * peers_size);
-    if(!peers) {
-        fprintf(stderr, "Erro: Falha na alocacao de peers!\n");
-        return NULL;
+void create_peers(ArrayList *peers, ArrayList *peers_txt){
+    for(int i = 0; i < peers_txt->count; i++) {
+        printf("Adicionando novo peer %s status %s\n", ((char**)peers_txt->elements)[i], status_string[0]);
+        peer np = {0};
+        create_address(&np, ((char*)peers_txt->elements)[i], 0);
+        append_element(peers, (void*)&np);
     }
-    for(int i = 0; i < peers_size; i++) {
-        printf("Adicionando novo peer %s status %s\n", peers_ip[i], status_string[0]);
-        create_address(&peers[i], peers_ip[i], 0);
-    }
-    return peers;
 }
 
 // append new peer
-int append_peer(peer **peers, size_t *peers_size, peer new_peer, int *i/*, char *file*/) {
-    peer *new_peers = realloc(*peers, (*peers_size + 1) * sizeof(peer));
-    if(!new_peers) {
-        fprintf(stderr, "Erro: Falha na alocacao de new_peers");
-        return -1; // FIXME: tratar possivel erro
-    }
-    *peers = new_peers;
-    (*peers)[*peers_size] = new_peer;
-    (*peers_size)++;
-
-    (*i) = *peers_size - 1;
+int append_peer(ArrayList *peers, peer new_peer, int *i/*, char *file*/) {
+    append_element(peers, (void*)&new_peer);
+    (*i) = peers->count - 1;
     // FILE *f = fopen(file, "a");
     // fprintf(f, "%s:%d\n", inet_ntoa((*peers)[(*i)].con.sin_addr), ntohs((*peers)[(*i)].con.sin_port));
     // fclose(f);
-    printf("\tAdicionando novo peer %s:%d status %s\n", inet_ntoa((*peers)[(*i)].con.sin_addr), ntohs((*peers)[(*i)].con.sin_port), status_string[(*peers)[(*i)].status]);
+    printf("\tAdicionando novo peer %s:%d status %s\n", inet_ntoa(((peer*)peers->elements)[*i].con.sin_addr), ntohs(((peer*)peers->elements)[*i].con.sin_port), status_string[((peer*)peers->elements)[*i].status]);
 
     return 1;
 }
@@ -90,7 +78,7 @@ int peer_in_list(peer a, peer *neighbours, size_t peers_size) {
 }
 
 // append received list to known peer list
-void append_list_peers(const char *buf, peer **peers, size_t *peers_size, size_t rec_peers_size/*, char *file*/) {
+void append_list_peers(const char *buf, ArrayList *peers, size_t rec_peers_size/*, char *file*/) {
     char *cpy = strdup(buf);
     strtok(cpy, " "); //ip
     strtok(NULL, " ");//clock
@@ -132,8 +120,8 @@ void append_list_peers(const char *buf, peer **peers, size_t *peers_size, size_t
         }
         
         bool add = true;
-        for(int j = 0; j < *peers_size; j++) {
-            if(is_same_peer(rec_peers_list[i], (*peers)[j])) {
+        for(int j = 0; j < peers->count; j++) {
+            if(is_same_peer(rec_peers_list[i], ((peer*)peers->elements)[j])) {
                 add = false;
                 break;
             }
@@ -141,7 +129,7 @@ void append_list_peers(const char *buf, peer **peers, size_t *peers_size, size_t
         if(add) {
             int j = 0;
             rec_peers_list[i].con.sin_family = AF_INET;
-            int res = append_peer(peers, peers_size, rec_peers_list[i], &j/*, file*/);
+            int res = append_peer(peers->elements, rec_peers_list[i], &j/*, file*/);
             if(res == -1) free(rec_peers_list);
         }
         free(cpy_l);

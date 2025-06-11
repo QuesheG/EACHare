@@ -5,6 +5,7 @@
 #include <string.h>
 #include <sys/types.h>
 
+#include <list.h>
 #include <file.h>
 #include <message.h>
 #include <peer.h>
@@ -17,12 +18,11 @@ pthread_mutex_t clock_lock;
 void *treat_request(void *args)
 {
     peer *server;
-    peer **peers;
-    size_t *peers_size;
-    char *file;
+    ArrayList *peers;
+    // char *file;
     SOCKET n_sock;
     char *dir_path;
-    get_args((listen_args *)args, &server, &peers, &peers_size, &file, &n_sock, &dir_path);
+    get_args((listen_args *)args, &server, peers, /*&file,*/ &n_sock, &dir_path);
 
     char *buf = calloc(MSG_SIZE, sizeof(char));
 
@@ -52,36 +52,35 @@ void *treat_request(void *args)
     printf("\n");
     printf("\tMensagem recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
     printf("\t=> Atualizando relogio para %d\n", server->p_clock);
-    int i = peer_in_list(sender, *peers, *peers_size);
+    int i = peer_in_list(sender, (peer *)peers->elements, peers->count);
     if (i < 0)
     {
         sender.status = ONLINE;
-        int res = append_peer(peers, peers_size, sender, &i /*, file*/);
-        if (res == -1)
-            return NULL;
+        int res = append_peer(peers, sender, &i);
+        if(res == -1) return NULL;
     }
-    if ((*peers)[i].status == OFFLINE && msg_type != BYE)
+    if (sender.status == OFFLINE && msg_type != BYE)
     {
-        (*peers)[i].status = ONLINE;
-        printf("\tAtualizando peer %s:%d status %s\n", inet_ntoa((*peers)[i].con.sin_addr), ntohs((*peers)[i].con.sin_port), status_string[1]);
-        (*peers)[i].p_clock = max((*peers)[i].p_clock, sender.p_clock);
+        ((peer*)peers->elements)[i].status = ONLINE;
+        printf("\tAtualizando peer %s:%d status %s\n", inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port), status_string[1]);
+        ((peer*)peers->elements)[i].p_clock = MAX(((peer*)peers->elements)[i].p_clock, sender.p_clock);
     }
     switch (msg_type)
     {
     case GET_PEERS:
-        share_peers_list(server, &clock_lock, n_sock, (*peers)[i], *peers, *peers_size);
+        share_peers_list(server, &clock_lock, n_sock, sender, peers);
         break;
     case LS:
-        share_files_list(server, &clock_lock, n_sock, (*peers)[i], dir_path);
+        share_files_list(server, &clock_lock, n_sock, sender, dir_path);
         break;
     case DL:
-        send_file(server, &clock_lock, buf, n_sock, (*peers)[i], dir_path);
+        send_file(server, &clock_lock, buf, n_sock, sender, dir_path);
         break;
     case BYE:
-        if ((*peers)[i].status == ONLINE)
+        if (sender.status == ONLINE)
         {
-            (*peers)[i].status = OFFLINE;
-            printf("\tAtualizando peer %s:%d status %s\n", inet_ntoa((*peers)[i].con.sin_addr), ntohs((*peers)[i].con.sin_port), status_string[0]);
+            ((peer*)peers->elements)[i].status = OFFLINE;
+            printf("\tAtualizando peer %s:%d status %s\n", inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port), status_string[0]);
         }
         break;
     default:
@@ -99,12 +98,11 @@ void *treat_request(void *args)
 void *listen_socket(void *args)
 {
     peer *server;
-    peer **peers;
-    size_t *peers_size;
-    char *file;
+    ArrayList *peers;
+    // char *file;
     SOCKET a;
     char *dir_path;
-    get_args((listen_args *)args, &server, &peers, &peers_size, &file, &a, &dir_path);
+    get_args((listen_args *)args, &server, peers, /*&file,*/ &a, &dir_path);
 
     peer client;
     socklen_t addrlen = sizeof(server->con);
@@ -134,7 +132,7 @@ void *listen_socket(void *args)
             return NULL;
 
         pthread_t response_thread;
-        listen_args *l_args = send_args(server, peers, peers_size, file, n_sock, dir_path);
+        listen_args *l_args = send_args(server, peers, /*file,*/ n_sock, dir_path);
         pthread_create(&response_thread, NULL, treat_request, (void *)l_args);
     }
     sock_close(server_soc);
@@ -166,14 +164,14 @@ int main(int argc, char **argv)
     }
 
     peer *server = malloc(sizeof(peer));
-    peer **peers = malloc(sizeof(peer *));
+    ArrayList *peers = alloc_list(sizeof(peer));
     int comm;
-    size_t *peers_size = malloc(sizeof(size_t)), files_len = 0;
-    char **peers_txt, **files;
+    ArrayList *peers_txt = alloc_list(sizeof(char *));
+    ArrayList *files = alloc_list(sizeof(char *));
     pthread_t listener_thread;
     int chunk_size = 256;
 
-    if (!peers || !peers_size || !server)
+    if (!peers || !peers_txt || !files)
     {
         fprintf(stderr, "Erro: falha na alocação de memoria\n");
         return 1;
@@ -189,19 +187,22 @@ int main(int argc, char **argv)
         perror(NULL);
         return 1;
     }
-    peers_txt = read_peers(f, peers_size);
-    *peers = create_peers((const char **)peers_txt, *peers_size);
+    size_t txt_len = 0;
+
+    append_many(peers_txt, read_peers(f, &txt_len), txt_len, sizeof(char *));
+    create_peers(peers, peers_txt);
     fclose(f);
-    for (int i = 0; i < *peers_size; i++)
+    for (int i = 0; i < peers_txt->count; i++)
     {
-        free(peers_txt[i]);
+        free(((char **)peers_txt->elements)[i]);
     }
-    free(peers_txt);
+    free_list(peers_txt);
 
     // read directory
-    files = get_dir_files(argv[3], &files_len);
+    size_t files_len = 0;
+    append_many(files, get_dir_files(argv[3], &files_len), files_len, sizeof(char *));
 
-    listen_args *args = send_args(server, peers, peers_size, argv[2], 0, argv[3]);
+    listen_args *args = send_args(server, peers/*, argv[2]*/, 0, argv[3]);
     pthread_create(&listener_thread, NULL, listen_socket, (void *)args);
 
     while (!should_quit)
@@ -225,16 +226,16 @@ int main(int argc, char **argv)
         switch (comm)
         {
         case 1:
-            show_peers(server, &clock_lock, *peers, *peers_size);
+            show_peers(server, &clock_lock, peers);
             break;
         case 2:
-            get_peers(server, &clock_lock, peers, peers_size /*, argv[2]*/);
+            get_peers(server, &clock_lock, peers /*, argv[2]*/);
             break;
         case 3:
-            show_files((const char **)files, files_len);
+            show_files(files);
             break;
         case 4:
-            get_files(server, &clock_lock, *peers, *peers_size, argv[3], &files, &files_len, chunk_size);
+            get_files(server, &clock_lock, peers, argv[3], files, chunk_size);
             break;
         case 5:
             // show_statistics();
@@ -254,17 +255,15 @@ int main(int argc, char **argv)
     }
 
     pthread_mutex_destroy(&clock_lock);
-    bye_peers(server, &clock_lock, *peers, *peers_size);
+    bye_peers(server, &clock_lock, peers);
     free(server);
-    free(*peers);
-    free(peers);
-    free(peers_size);
+    free_list(peers);
     free(args);
-    for (int i = 0; i < files_len; i++)
+    for (int i = 0; i < files->count; i++)
     {
-        free(files[i]);
+        free(((char **)files->elements)[i]);
     }
-    free(files);
+    free_list(files);
 #ifdef WIN
     WSACleanup();
 #endif
