@@ -40,10 +40,7 @@ void show_peers(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers)
         return;
     else if (input > 0 && input <= peers->count)
     {
-        pthread_mutex_lock(clock_lock);
-        server->p_clock++;
-        pthread_mutex_unlock(clock_lock);
-        printf("\t=> Atualizando relogio para %d\n", server->p_clock);
+        update_clock(server, clock_lock, 0);
         char *msg = build_message(server->con, server->p_clock, HELLO, NULL);
         if (!msg)
         {
@@ -70,10 +67,7 @@ void get_peers(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers /*, c
     size_t loop_len = peers->count;
     for (int i = 0; i < loop_len; i++)
     {
-        pthread_mutex_lock(clock_lock);
-        server->p_clock++;
-        pthread_mutex_unlock(clock_lock);
-        printf("\t=> Atualizando relogio para %d\n", server->p_clock);
+        update_clock(server, clock_lock, 0);
         char *msg = build_message(server->con, server->p_clock, GET_PEERS, NULL);
         if (!msg)
         {
@@ -124,12 +118,9 @@ void share_peers_list(peer *server, pthread_mutex_t *clock_lock, SOCKET soc, pee
 {
     peer_list_args args;
     args.sender = sender;
-    args.peers = peers;
+    args.peers = (peer*)peers->elements;
     args.peers_size = peers->count;
-    pthread_mutex_lock(clock_lock);
-    server->p_clock++;
-    pthread_mutex_unlock(clock_lock);
-    printf("\t=> Atualizando relogio para %d\n", server->p_clock);
+    update_clock(server, clock_lock, 0);
     char *msg = build_message(server->con, server->p_clock, PEER_LIST, (void *)&args);
     if (!msg)
     {
@@ -142,7 +133,7 @@ void share_peers_list(peer *server, pthread_mutex_t *clock_lock, SOCKET soc, pee
 }
 
 // asks for files of all peers
-void get_files(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers, char *dir_path, ArrayList *files_list, int size_chunk)
+void get_files(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers, const char *dir_path, ArrayList *files_list, int size_chunk /*, stat_block statistics*/)
 {
     ArrayList *files = receive_files(server, clock_lock, peers);
     print_files_received(files);
@@ -171,8 +162,11 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers, char
         fprintf(stderr, "Erro: Falha abrindo arquivo");
         return;
     }
+
+    for(int i = 0; i < chosen_file.file.fsize; i++)
+        fputc(0, new_file);
     
-    download_file(server, clock_lock, chosen_file, holders, size_chunk, new_file);
+    download_file(server, clock_lock, chosen_file, holders, size_chunk);
 
     char *n_entry = strdup(chosen_file.file.fname);
     if (!n_entry)
@@ -273,7 +267,6 @@ void send_file(peer *server, pthread_mutex_t *clock_lock, char *buf, SOCKET con,
         free(fargs);
         return;
     }
-    fargs->file_size = fsize(file_path);
     char *file_cont = malloc(sizeof(char) * fargs->chunk_size);
     if (!file_cont)
     {
@@ -353,7 +346,7 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
         {
             if (is_same_peer(sender, peers[i]))
                 continue;
-            sprintf(msg, "%s %s:%d:%s:%d", msg, inet_ntoa(peers[i].con.sin_addr), ntohs(peers[i].con.sin_port), status_string[peers[i].status], peers[i].p_clock);
+            sprintf(msg, "%s %s:%d:%s:%ld", msg, inet_ntoa(peers[i].con.sin_addr), ntohs(peers[i].con.sin_port), status_string[peers[i].status], peers[i].p_clock);
         }
         sprintf(msg, "%s\n", msg);
         break;
@@ -604,6 +597,8 @@ char *check_msg_full(const char *buf, SOCKET sock, MSG_TYPE msg_type, void *args
     return NULL;
 }
 
+
+
 ArrayList *receive_files(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers) {
     ArrayList *files = alloc_list(sizeof(ls_files*));
     
@@ -611,15 +606,13 @@ ArrayList *receive_files(peer *server, pthread_mutex_t *clock_lock, ArrayList *p
     {
         if (((peer*)peers->elements)[i].status == OFFLINE)
             continue;
-        pthread_mutex_lock(clock_lock);
-        server->p_clock++;
-        pthread_mutex_unlock(clock_lock);
-        printf("\t=> Atualizando relogio para %d\n", server->p_clock);
+        update_clock(server, clock_lock, 0);
         char *msg = build_message(server->con, server->p_clock, LS, NULL);
         if (!msg)
         {
             perror("Erro: Falha na construcao da mensagem!\n");
-            return;
+            free_list(files);
+            return NULL;
         }
         SOCKET req = send_message(msg, &(((peer*)peers->elements)[i]), LS);
         if (is_invalid_sock(req))
@@ -648,27 +641,25 @@ ArrayList *receive_files(peer *server, pthread_mutex_t *clock_lock, ArrayList *p
         }
         buf[valread] = '\0';
 
-        pthread_mutex_lock(clock_lock);
-        server->p_clock = MAX(server->p_clock, sender.p_clock) + 1;
-        pthread_mutex_unlock(clock_lock);
         if (rec_files_size == 0)
         {
             printf("\tResposta recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
-            printf("\t=> Atualizando relogio para %d\n", server->p_clock);
+            update_clock(server, clock_lock, sender.p_clock);
             free(buf);
             free(msg);
             sock_close(req);
             continue;
         }
-
+        
         printf("\tResposta recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
-        printf("\t=> Atualizando relogio para %d\n", server->p_clock);
+        update_clock(server, clock_lock, sender.p_clock);
         printf("\n");
         append_files_list(buf, files, sender, rec_files_size);
         free(buf);
         sock_close(req);
         free(msg);
     }
+    return files;
 }
 
 void print_files_received(ArrayList *files) {
@@ -715,78 +706,119 @@ void print_files_received(ArrayList *files) {
     }
 }
 
-void download_file(peer *server, pthread_mutex_t *clock_lock, ls_files chosen_file, ArrayList *holders, size_t size_chunk, FILE *new_file) {
-    uint64_t round = 0;
-    size_t written = 0;
-    //FIXME: essa parte poderia ser paralelizada :(
-    while(written < chosen_file.file.fsize) {
-        for(int i = 0; i < chosen_file.peers_size; i++) {
-            dl_msg_args *args = malloc(sizeof(dl_msg_args));
-            args->fname = chosen_file.file.fname;
-            args->chunk_size = size_chunk;
-            args->offset = i + (round * chosen_file.peers_size);
-            pthread_mutex_lock(clock_lock);
-            server->p_clock++;
-            pthread_mutex_unlock(clock_lock);
-            printf("\t=> Atualizando relogio para %d\n", server->p_clock);
-            char *msg = build_message(server->con, server->p_clock, DL, (void *)args);
-            free(args);
-            if(!msg) return;
-            SOCKET req = send_message(msg, &(((peer*)holders->elements)[i]), DL);
-            if(is_invalid_sock(req)) {
-                fprintf(stderr, "\nErro: Falha com socket\n");
-                free(msg);
-                return;
-            }
+void *download_file_thread(void *args) {
+    work_download *a = (work_download*)args;
+    peer *server = a->server;
+    pthread_mutex_t *lock = a->lock;
+    uint8_t id = a->thread_id;
+    uint8_t threads_size = a->thread_l_size;
+    ls_files nfile = a->file;
+    int chunk = a->chunk_size;
+    char *file_path = dir_file_path(a->dir_path, nfile.file.fname);
+    int round = 0;
+    uint64_t offset = id * chunk;
+    FILE *file = fopen(file_path, "wb");
+    free(file_path);
+    peer *holders = (peer*)nfile.holders;
+    while(offset < nfile.file.fsize) {
+        peer req_peer = holders[(id + (round*threads_size)) % nfile.holders->count];
+        dl_msg_args *dargs = malloc(sizeof(*dargs));
+        dargs->chunk_size = chunk;
+        dargs->fname = nfile.file.fname;
+        dargs->offset = offset;
+        update_clock(server, lock, 0);
+        char *msg = build_message(server->con, server->p_clock, DL, (void*)dargs);
+        free(dargs);
+        if(!msg) continue;
+        SOCKET req = send_message(msg, &(req_peer), DL);
+        if(is_invalid_sock(req)) {
+            fprintf(stderr, "\nErro: Falha com socket\n");
             free(msg);
-            size_t temp_size = MSG_SIZE + 26 + base64encode_len(size_chunk);
-            char *buf = calloc(temp_size + 1, sizeof(char));
-            if(!buf) {
-                fprintf(stderr, "\nErro: Falha na alocacao de recebimento!\n");
-                sock_close(req);
-                return;
-            }
-            ssize_t total_received = 0;
-            while(total_received < temp_size) {
-                ssize_t valread = recv(req, buf + total_received, temp_size - total_received, 0);
-                if(valread < 0) {
-                    fprintf(stderr, "\nErro: Falha no recebimento\n");
-                    free(buf);
-                    return;
-                }
-                if(!valread)
-                break;
-                total_received += valread;
-            }
-            buf[total_received] = 0;
-            
-            printf("\n");
-            printf("\nResposta recebida:  \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
-            
-            int sent_chunk, offset;
-            int clock = 0;
-            char *file_b64 = get_file_in_msg(buf, &clock, NULL, &sent_chunk, &offset);
-            pthread_mutex_lock(clock_lock);
-            server->p_clock = MAX(server->p_clock, clock) + 1;
-            pthread_mutex_unlock(clock_lock);
-            printf("\t=> Atualizando relogio para %d\n", server->p_clock);
-            if(!file_b64) {
-                fprintf(stderr, "Erro: Falha no recebimento do arquivo\n");
-                free(buf);
-                return;
-            }
-            char *file_decoded = malloc(sizeof(char) * (size_chunk + 1));
-            if(!file_decoded) {
-                fprintf(stderr, "Erro: Falha na alocacao\n");
-                free(buf);
-                return;
-            }
-            int decode_size = base64_decode(file_decoded, file_b64);
-            written += fwrite(file_decoded, 1, decode_size, new_file);
-            free(file_decoded);
-            free(buf);
+            continue;
         }
+        free(msg);
+        size_t temp_size = MSG_SIZE + 26 + base64encode_len(chunk);
+        char *buf = calloc(temp_size + 1, sizeof(char));
+        if(!buf) {
+            fprintf(stderr, "\nErro: Falha na alocacao de recebimento!\n");
+            sock_close(req);
+            return;
+        }
+        ssize_t total_received = 0;
+        while(total_received < temp_size) {
+            ssize_t valread = recv(req, buf + total_received, temp_size - total_received, 0);
+            bool done = false;
+            for(int i = 0; i < valread; i++) {
+                if(*(buf + total_received + valread) == '\n') {
+                    done = true;
+                    break;
+                }
+            }
+            if(done) {
+                total_received += valread;
+                break;
+            }
+            if(valread < 0) {
+                fprintf(stderr, "\nErro: Falha no recebimento\n");
+                free(buf);
+                return;
+            }
+            if(!valread)
+                break;
+            total_received += valread;
+        }
+        buf[total_received] = 0;
+        printf("\n");
+        printf("\nResposta recebida:  \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
+        
+        int rec_chunk, soffset;
+        int clock = 0;
+        char *file_b64 = get_file_in_msg(buf, &clock, NULL, &rec_chunk, &soffset);
+        update_clock(server, lock, clock);
+        if(soffset != offset || rec_chunk > chunk) {
+            fprintf(stderr, "Erro: Mensagem inesperada\n");
+            free(buf);
+            continue;
+        } 
+        if(!file_b64) {
+            fprintf(stderr, "Erro: Falha no recebimento do arquivo\n");
+            free(buf);
+            continue;
+        }
+        char *file_decoded = malloc(sizeof(char) * (rec_chunk + 1));
+        if(!file_decoded) {
+            fprintf(stderr, "Erro: Falha na alocacao\n");
+            free(buf);
+            continue;
+        }
+        int decode_size = base64_decode(file_decoded, file_b64);
+        fseek(file, offset, SEEK_SET);
+        fwrite(file_decoded, 1, decode_size, file);
+        free(file_decoded);
+        free(buf);
         round++;
+        offset += round * threads_size * chunk;
+    }
+    free(a);
+    pthread_exit(NULL);
+    return NULL;
+}
+
+void download_file(peer *server, pthread_mutex_t *clock_lock, ls_files chosen_file, const char *dir_path, size_t size_chunk) {
+    char size_thread_pool = 8;
+    pthread_t *thread_pool = malloc(sizeof(pthread_t) * size_thread_pool);
+    for(int i = 0; i < size_thread_pool; i++) {
+        work_download *a = malloc(sizeof(*a));
+        a->server = server;
+        a->lock = clock_lock;
+        a->thread_id = i;
+        a->thread_l_size = size_thread_pool;
+        a->file = chosen_file;
+        a->chunk_size = size_chunk;
+        a->dir_path = dir_path;
+        //a->statistics = statistics;
+        pthread_create(&(thread_pool[i]), NULL, download_file_thread, (void*)&a);
+        pthread_detach(thread_pool[i]);
     }
 }
 
@@ -918,10 +950,7 @@ void bye_peers(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers)
     {
         if (((peer*)peers->elements)[i].status == ONLINE)
         {
-            pthread_mutex_lock(clock_lock);
-            server->p_clock++;
-            pthread_mutex_unlock(clock_lock);
-            printf("\t=> Atualizando relogio para %d\n", server->p_clock);
+            update_clock(server, clock_lock, 0);
             char *msg = build_message(server->con, server->p_clock, BYE, NULL);
             if (!msg)
                 continue;

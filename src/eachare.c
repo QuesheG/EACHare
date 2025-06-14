@@ -22,7 +22,7 @@ void *treat_request(void *args)
     // char *file;
     SOCKET n_sock;
     char *dir_path;
-    get_args((listen_args *)args, &server, peers, /*&file,*/ &n_sock, &dir_path);
+    get_args((listen_args *)args, &server, &peers, /*&file,*/ &n_sock, &dir_path);
 
     char *buf = calloc(MSG_SIZE, sizeof(char));
 
@@ -45,13 +45,9 @@ void *treat_request(void *args)
 
     buf[valread] = '\0';
 
-    pthread_mutex_lock(&clock_lock);
-    server->p_clock = MAX(server->p_clock, sender.p_clock) + 1;
-    pthread_mutex_unlock(&clock_lock);
-
     printf("\n");
     printf("\tMensagem recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
-    printf("\t=> Atualizando relogio para %d\n", server->p_clock);
+    update_clock(server, clock_lock, sender.p_clock);
     int i = peer_in_list(sender, (peer *)peers->elements, peers->count);
     if (i < 0)
     {
@@ -102,7 +98,7 @@ void *listen_socket(void *args)
     // char *file;
     SOCKET a;
     char *dir_path;
-    get_args((listen_args *)args, &server, peers, /*&file,*/ &a, &dir_path);
+    get_args((listen_args *)args, &server, &peers, /*&file,*/ &a, &dir_path);
 
     peer client;
     socklen_t addrlen = sizeof(server->con);
@@ -134,6 +130,7 @@ void *listen_socket(void *args)
         pthread_t response_thread;
         listen_args *l_args = send_args(server, peers, /*file,*/ n_sock, dir_path);
         pthread_create(&response_thread, NULL, treat_request, (void *)l_args);
+        pthread_detach(response_thread);
     }
     sock_close(server_soc);
     free(args);

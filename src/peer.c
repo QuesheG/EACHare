@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <inttypes.h>
 #include <sock.h>
 #include <peer.h>
 
@@ -14,7 +15,7 @@ bool is_same_peer(peer a, peer b) {
 }
 
 // create an IPv4 sockaddr_in
-void create_address(peer *address, const char *ip, uint32_t clock) {
+void create_address(peer *address, const char *ip, uint64_t clock) {
     char *ip_cpy = strdup(ip);
     char *tokip = strtok(ip_cpy, ":");
     char *tokport = strtok(NULL, ":");
@@ -51,7 +52,7 @@ void create_peers(ArrayList *peers, ArrayList *peers_txt){
     for(int i = 0; i < peers_txt->count; i++) {
         printf("Adicionando novo peer %s status %s\n", ((char**)peers_txt->elements)[i], status_string[0]);
         peer np = {0};
-        create_address(&np, ((char*)peers_txt->elements)[i], 0);
+        create_address(&np, ((char**)peers_txt->elements)[i], 0);
         append_element(peers, (void*)&np);
     }
 }
@@ -137,4 +138,12 @@ void append_list_peers(const char *buf, ArrayList *peers, size_t rec_peers_size/
 
     free(cpy);
     free(rec_peers_list);
+}
+
+// update clock 
+void update_clock(peer *a, pthread_mutex_t *clock_lock, uint64_t n_clock) {
+    pthread_mutex_lock(clock_lock);
+    a->p_clock = MAX(a->p_clock, n_clock) + 1;
+    pthread_mutex_unlock(clock_lock);
+    printf("\t=> Atualizando relogio para %" PRIu64 "\n", a->p_clock);
 }
