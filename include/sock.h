@@ -27,5 +27,6 @@ int init_win_sock(void);
 
 void sock_close(SOCKET sock); // standard function for socket creation
 void show_soc_error(); // standard function for socket error messages
+int send_complete(SOCKET sock, const void *buf, size_t len, int flag); 
 
 #endif

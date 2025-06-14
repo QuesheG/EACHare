@@ -3,8 +3,9 @@
 
 #include <stdbool.h>
 #include <stdlib.h>
-#include <sock.h>
 #include <stdint.h>
+#include <pthread.h>
+#include <sock.h>
 #include <list.h>
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))

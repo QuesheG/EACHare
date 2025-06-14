@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
+#include <sys/types.h>
 #include <sock.h>
 
 #ifdef WIN
@@ -37,4 +38,16 @@ void show_soc_error() {
 #else
     fprintf(stderr, "%d: %s\n", errno, strerror(errno));
 #endif
+}
+
+// send full message
+int send_complete(SOCKET sock, const void *buf, size_t len, int flag) {
+    size_t sent = 0;
+    while(sent < len) {
+        ssize_t n = send(sock, (char *)buf + sent, len - sent, flag);
+        if(n <= 0)
+            return -1;
+        sent += n;
+    }
+    return 0;
 }
