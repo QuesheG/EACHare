@@ -22,7 +22,7 @@ typedef enum _msg_type
     LS,
     LS_LIST,
     DL,
-    FILEMSG, // msg_type = FILE type (stdio)😢
+    FILEMSG, // msg_type = FILE type (stdio)
     BYE
 } MSG_TYPE;
 
@@ -92,23 +92,24 @@ typedef struct _stat
     double std_dev;
 } stat_block;
 
-void show_peers(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers);                                                                                    // print the peers in list
-void get_peers(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers /*, char *file*/);                                                                    // request the peers list of every known peer
-void share_peers_list(peer *server, pthread_mutex_t *clock_lock, SOCKET con, peer sender, ArrayList *peers);                                                     // share the peers list with who requested
+void show_peers(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers); // print the peers in list
+void get_peers(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers /*, char *file*/); // request the peers list of every known peer
+void share_peers_list(peer *server, pthread_mutex_t *clock_lock, SOCKET con, peer sender, ArrayList *peers); // share the peers list with who requested
 void get_files(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers, const char *dir_path, ArrayList *files_list, int size_chunk, ArrayList *statistics); // asks for files of all peers
-void share_files_list(peer *server, pthread_mutex_t *clock_lock, SOCKET con, peer sender, char *dir_path);                                                       // send list of files
-int send_complete(SOCKET sock, const void *buf, size_t len, int flag);                                                                                           // send full message
-void send_file(peer *server, pthread_mutex_t *clock_lock, char *buf, SOCKET con, peer sender, char *dir_path);                                                   // send file
-char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *args);                                                                            // create a message with the sender ip, its clock and the message type
-SOCKET send_message(const char *msg, peer *neighbour, MSG_TYPE msg_type);                                                                                        // send a built message to an known peer socket
-MSG_TYPE read_message(const char *buf, peer *sender);                                                                                                            // read message, mark its sender and return the message type
-char *check_msg_full(const char *buf, SOCKET sock, MSG_TYPE msg_type, void *args, ssize_t *valread);                                                             // check if message received was read fully
-ArrayList *receive_files(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers);                                                                           // receive messages for files
-void print_files_received(ArrayList *files);                                                                                                                     // print files received
-void download_file(peer *server, pthread_mutex_t *clock_lock, ls_files chosen_file, const char *dir_path, size_t size_chunk, ArrayList *statistics);             // download chosen file
-void append_files_list(const char *buf, ArrayList *list, peer sender, size_t rec_files_len);                                                                     // append list received to known list
-char *get_file_in_msg(char *buf, int *clock, char **fname, int *chunk_size, int *offset);                                                                        // return the file in base64 format
-void change_chunk_size(int *chunk_size);                                                                                                                         // change the local chunk_size
-void bye_peers(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers);                                                                                     // send a bye message to every peer in list
+void share_files_list(peer *server, pthread_mutex_t *clock_lock, SOCKET con, peer sender, char *dir_path); // send list of files
+int send_complete(SOCKET sock, const void *buf, size_t len, int flag); // send full message
+void send_file(peer *server, pthread_mutex_t *clock_lock, char *buf, SOCKET con, peer sender, char *dir_path); // send file
+char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *args); // create a message with the sender ip, its clock and the message type
+SOCKET send_message(const char *msg, peer *neighbour, MSG_TYPE msg_type); // send a built message to an known peer socket
+MSG_TYPE read_message(const char *buf, peer *sender); // read message, mark its sender and return the message type
+char *check_msg_full(const char *buf, SOCKET sock, MSG_TYPE msg_type, void *args, ssize_t *valread); // check if message received was read fully
+ArrayList *receive_files(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers); // receive messages for files
+void print_files_received(ArrayList *files); // print files received
+void download_file(peer *server, pthread_mutex_t *clock_lock, ls_files chosen_file, const char *dir_path, size_t size_chunk, ArrayList *statistics); // download chosen file
+void append_files_list(const char *buf, ArrayList *list, peer sender, size_t rec_files_len); // append list received to known list
+char *get_file_in_msg(char *buf, int *clock, char **fname, int *chunk_size, int *offset); // return the file in base64 format
+void print_statistics(ArrayList *statistics); // print statistics gathered
+void change_chunk_size(int *chunk_size); // change the local chunk_size
+void bye_peers(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers); // send a bye message to every peer in list
 
 #endif

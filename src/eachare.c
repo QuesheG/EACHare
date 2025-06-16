@@ -188,18 +188,18 @@ int main(int argc, char **argv)
     size_t txt_len = 0;
     char **peers_read = read_peers(f, &txt_len);
     append_many(peers_txt, peers_read, txt_len, sizeof(char *));
+    free(peers_read);
     create_peers(peers, peers_txt);
     fclose(f);
     for (int i = 0; i < peers_txt->count; i++)
-    {
         free(((char **)peers_txt->elements)[i]);
-    }
     free_list(peers_txt);
 
     // read directory
     size_t files_len = 0;
     char **files_read = get_dir_files(argv[3], &files_len);
     append_many(files, files_read, files_len, sizeof(char *));
+    free(files_read);
 
     listen_args *args = send_args(server, peers /*, argv[2]*/, 0, argv[3]);
     pthread_create(&listener_thread, NULL, listen_socket, (void *)args);
@@ -237,7 +237,7 @@ int main(int argc, char **argv)
             get_files(server, &clock_lock, peers, argv[3], files, chunk_size, statistics);
             break;
         case 5:
-            // show_statistics();
+            print_statistics(statistics);
             break;
         case 6:
             change_chunk_size(&chunk_size);
