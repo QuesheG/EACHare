@@ -29,8 +29,6 @@ python testing.py
 This product includes software developed by the Apache Group for use in the Apache HTTP server project (http://www.apache.org/).
 
 ## TODO:
-Fix errs
-Requisitos EP3
-message.h define max for linux
-fix get_files holders
-fix append_files_list params
+- fix send
+- fix append list files same filename
+- fix memory leak

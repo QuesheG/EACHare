@@ -163,7 +163,6 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers, cons
     for(int i = 0; i < files->count; i++)
         free(((ls_files *)files->elements)[i].file.fname);
     free_list(files);
-    free(files);
     free(file_path);
     fclose(new_file);
 }
@@ -237,7 +236,7 @@ void send_file(peer *server, pthread_mutex_t *clock_lock, char *buf, SOCKET con,
         free(fargs);
         return;
     }
-    char *file_cont = malloc(sizeof(char) * fargs->chunk_size);
+    char *file_cont = calloc(fargs->chunk_size, sizeof(char));
     if(!file_cont) {
         fprintf(stderr, "Erro: Falha alocando conteudo do arquivo\n");
         fclose(file);
@@ -246,7 +245,7 @@ void send_file(peer *server, pthread_mutex_t *clock_lock, char *buf, SOCKET con,
         return;
     }
     fseek(file, fargs->chunk_size * fargs->offset, SEEK_SET);
-    fread(file_cont, fargs->chunk_size, 1, file);
+    fread(file_cont, 1, fargs->chunk_size, file);
     char *encoded = malloc(sizeof(char) * base64encode_len(fargs->chunk_size));
     if(!encoded) {
         fprintf(stderr, "Erro: Falha alocando arquivo codificado\n");
@@ -341,7 +340,7 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
         break;
     case FILEMSG:;
         file_msg_args *fargs = (file_msg_args *)args;
-        temp = realloc(msg, sizeof(char) * (msg_size_files_list(1) + base64encode_len(fargs->file_size)));
+        temp = realloc(msg, sizeof(char) * (msg_size_files_list(1) + base64encode_len(fargs->chunk_size)));
         if(!temp) {
             fprintf(stderr, "Erro: Falha na alocacao da mensagem!\n");
             return NULL;
@@ -603,7 +602,7 @@ void print_files_received(ArrayList *files) {
         printf("[%0*d] ", count_size, i + 1);
         printf("%-*s", max_fname_size, ilsf.file.fname);
         printf(" | ");
-        printf("%-*d", max_fsize_size, (size_t)ilsf.file.fsize);
+        printf("%-*" PRIu64, max_fsize_size, (uint64_t)ilsf.file.fsize);
         printf(" | ");
         printf("%s:%d", inet_ntoa(holders[0].con.sin_addr), ntohs(holders[0].con.sin_port));
         for(int j = 1; j < ilsf.peers_size; j++)
@@ -710,7 +709,7 @@ void *download_file_thread(void *args) {
     return NULL;
 }
 
-bool stat_in_list(stat_block *list, size_t list_size, stat_block new_stat) {
+int stat_in_list(stat_block *list, size_t list_size, stat_block new_stat) {
     for(int i = 0; i < list_size; i++) {
         if(list[i].chunk_used == new_stat.chunk_used && list[i].fsize == new_stat.fsize && list[i].n_peers == new_stat.n_peers)
             return i;
@@ -868,7 +867,9 @@ char *get_file_in_msg(char *buf, int *clock, char **fname, int *chunk_size, int 
         *fname = strdup(n);
     *chunk_size = atoi(strtok(NULL, " "));
     *offset = atoi(strtok(NULL, " "));
-    return strtok(NULL, "\n");
+    char *ret = strtok(NULL, "\n");
+    if(ret) ret = strdup(ret);
+    return ret;
 }
 
 // print statistics gathered

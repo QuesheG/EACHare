@@ -48,7 +48,6 @@ void *treat_request(void *args)
     printf("\n");
     printf("\tMensagem recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
     update_clock(server, &clock_lock, sender.p_clock);
-    printf("\n%d\n", msg_type);
     int i = peer_in_list(sender, (peer *)peers->elements, peers->count);
     if (i < 0)
     {
@@ -212,7 +211,7 @@ int main(int argc, char **argv)
                "\t[2] Obter peers\n"
                "\t[3] Listar arquivos locais\n"
                "\t[4] Buscar arquivos\n"
-               "\t[5] Exibir estatisticas -> WIP\n"
+               "\t[5] Exibir estatisticas\n"
                "\t[6] Alterar tamanho da chunk\n"
                "\t[9] Sair\n");
         printf(">");

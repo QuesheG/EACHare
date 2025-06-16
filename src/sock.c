@@ -3,6 +3,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sock.h>
+#include <fcntl.h>
 
 #ifdef WIN
 int init_win_sock(void) {
