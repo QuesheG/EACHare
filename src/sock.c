@@ -40,6 +40,21 @@ void show_soc_error() {
 #endif
 }
 
+bool set_sock_block(SOCKET sock, bool blocking)
+{
+   if (sock < 0) return false;
+
+#ifdef _WIN32
+   unsigned long mode = blocking ? 0 : 1;
+   return (ioctlsocket(sock, FIONBIO, &mode) == 0);
+#else
+   int flags = fcntl(sock, F_GETFL, 0);
+   if (flags == -1) return false;
+   flags = blocking ? (flags & ~O_NONBLOCK) : (flags | O_NONBLOCK);
+   return (fcntl(sock, F_SETFL, flags) == 0);
+#endif
+}
+
 // send full message
 int send_complete(SOCKET sock, const void *buf, size_t len, int flag) {
     size_t sent = 0;

@@ -21,12 +21,15 @@
 #define INVALID_SOCKET -1
 #endif
 
+#include <stdbool.h>
+
 #ifdef WIN
 int init_win_sock(void);
 #endif
 
 void sock_close(SOCKET sock); // standard function for socket creation
 void show_soc_error(); // standard function for socket error messages
+bool set_sock_block(SOCKET sock, bool blocking);
 int send_complete(SOCKET sock, const void *buf, size_t len, int flag); 
 
 #endif

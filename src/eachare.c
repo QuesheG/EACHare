@@ -48,6 +48,7 @@ void *treat_request(void *args)
     printf("\n");
     printf("\tMensagem recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
     update_clock(server, &clock_lock, sender.p_clock);
+    printf("\n%d\n", msg_type);
     int i = peer_in_list(sender, (peer *)peers->elements, peers->count);
     if (i < 0)
     {
@@ -56,7 +57,7 @@ void *treat_request(void *args)
         if (res == -1)
             return NULL;
     }
-    if (sender.status == OFFLINE && msg_type != BYE)
+    if (((peer *)peers->elements)[i].status == OFFLINE && msg_type != BYE)
     {
         ((peer *)peers->elements)[i].status = ONLINE;
         printf("\tAtualizando peer %s:%d status %s\n", inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port), status_string[1]);
@@ -133,7 +134,7 @@ void *listen_socket(void *args)
         pthread_create(&response_thread, NULL, treat_request, (void *)l_args);
         pthread_detach(response_thread);
     }
-    sock_close(server_soc);
+    sock_close(server_soc); //TODO: tirar responsabilidade da thread
     free(args);
     pthread_exit(NULL);
     return NULL;
@@ -247,7 +248,6 @@ int main(int argc, char **argv)
             printf("Saindo...\n");
             should_quit = true;
             pthread_cancel(listener_thread);
-            pthread_join(listener_thread, NULL);
             break;
         default:
             printf("Comando inesperado\n");
@@ -260,9 +260,7 @@ int main(int argc, char **argv)
     free(server);
     free_list(peers);
     for (int i = 0; i < files->count; i++)
-    {
         free(((char **)files->elements)[i]);
-    }
     free_list(files);
 #ifdef WIN
     WSACleanup();

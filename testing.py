@@ -25,21 +25,17 @@ for i in range(8):
     os.chdir("g0" + str(i))
     try: os.mkdir("files")
     except: pass
-    for j in range(8):
-        if network[i][j]:
-            if j == 0:
-                with open(f_peers, "w") as file:
-                    file.write("127.0.0.1:500" + str(j) + "\n")
-            else:
-                with open(f_peers, "a") as file:
-                    file.write("127.0.0.1:500" + str(j) + "\n")
+    with open(f_peers, "w") as file:
+        for j in range(8):
+            if network[i][j]:
+                file.write("127.0.0.1:500" + str(j) + "\n")
     os.chdir("..")
 
 os.chdir("..")
 for i in range(8):
     if platform.system() == "Windows":
         shutil.copy(os.getcwd()+"/eachare.exe", os.getcwd()+"/testing/g0"+str(i))
-        #os.system("start ./testing/g0"+str(i)+"/eachare.exe 127.0.0.1:500"+str(i)+" ./testing/g0"+str(i)+"/peers.txt ./testing/g0"+str(i)+"/files")
+        # os.system("start ./testing/g0"+str(i)+"/eachare.exe 127.0.0.1:500"+str(i)+" ./testing/g0"+str(i)+"/peers.txt ./testing/g0"+str(i)+"/files")
     if platform.system() == "Linux":
         shutil.copy(os.getcwd()+"/eachare", os.getcwd()+"/testing/g0"+str(i))
         # os.system("ptyxis -s -- sh -c ./testing/g0"+str(i)+"/eachare 127.0.0.1:500"+str(i)+" ./testing/g0"+str(i)+"/peers.txt ./testing/g0"+str(i)+"/files")

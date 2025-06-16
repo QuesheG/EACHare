@@ -260,7 +260,7 @@ void send_file(peer *server, pthread_mutex_t *clock_lock, char *buf, SOCKET con,
     fargs->contentb64 = encoded;
     char *msg = build_message(server->con, server->p_clock, FILEMSG, (void *)fargs);
     if(msg) {
-        printf("\tEncaminhando mensagem \"%.*s\" para %s:%d\n", (int)strcspn(msg, "\n"), msg, inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port));
+        printf("\tEncaminhando mensagem \"%.*s\" para %s:%d\n", (int)MAX(strcspn(msg, "\n"), MSG_SIZE), msg, inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port));
         send_complete(con, msg, strlen(msg) + 1, 0);
     }
     sock_close(con);
@@ -622,11 +622,11 @@ void *download_file_thread(void *args) {
     int chunk = a->chunk_size;
     char *file_path = dir_file_path(a->dir_path, nfile.file.fname);
     int round = 0;
-    uint64_t offset = id * chunk;
+    uint64_t offset = id;
     FILE *file = fopen(file_path, "wb");
     free(file_path);
     peer *holders = (peer *)nfile.holders->elements;
-    while(offset < nfile.file.fsize) {
+    while(offset * chunk < nfile.file.fsize) {
         peer req_peer = holders[(id + (round * threads_size)) % nfile.holders->count];
         dl_msg_args *dargs = malloc(sizeof(*dargs));
         dargs->chunk_size = chunk;
@@ -654,25 +654,26 @@ void *download_file_thread(void *args) {
         ssize_t total_received = 0;
         while(total_received < temp_size) {
             ssize_t valread = recv(req, buf + total_received, temp_size - total_received, 0);
+            
+            if(valread < 0) {
+                fprintf(stderr, "\nErro: Falha no recebimento\n");
+                show_soc_error();
+                free(buf);
+                break;
+            }
+            if(!valread)
+                break;
+            
             bool done = false;
             for(int i = 0; i < valread; i++) {
-                if(*(buf + total_received + valread) == '\n') {
+                if(buf[total_received + i] == '\n') {
                     done = true;
                     break;
                 }
             }
-            if(done) {
-                total_received += valread;
-                break;
-            }
-            if(valread < 0) {
-                fprintf(stderr, "\nErro: Falha no recebimento\n");
-                free(buf);
-                continue;
-            }
-            if(!valread)
-                break;
             total_received += valread;
+            if(done) 
+                break;
         }
         buf[total_received] = 0;
         printf("\n");
@@ -697,11 +698,11 @@ void *download_file_thread(void *args) {
             continue;
         }
         int decode_size = base64_decode(file_decoded, file_b64);
-        fseek(file, offset, SEEK_SET);
+        fseek(file, offset * chunk, SEEK_SET);
         fwrite(file_decoded, 1, decode_size, file);
         free(file_decoded);
         round++;
-        offset += round * threads_size * chunk;
+        offset += round * threads_size;
     }
     fclose(file);
     free(a);
@@ -816,7 +817,7 @@ void append_files_list(const char *buf, ArrayList *list, peer sender, size_t rec
         int position;
 
         if(first_iteration) {
-            position = i;
+            position = 0;
             ls_files a = {
                 .file.fname = strdup(infoname),
                 .file.fsize = atoi(infosize),
@@ -833,10 +834,11 @@ void append_files_list(const char *buf, ArrayList *list, peer sender, size_t rec
             for(j = 0; j < list->count; j++) {
                 if(strcmp(fname, ((ls_files *)list->elements)[j].file.fname) == 0 && fsize == ((ls_files *)list->elements)[j].file.fsize) {
                     position = j;
+                    free(fname);
                     break;
                 }
             }
-            if(position != j) {
+            if(position == list->count) {
                 ls_files a = {
                     .file.fname = fname,
                     .file.fsize = fsize,
@@ -868,6 +870,7 @@ char *get_file_in_msg(char *buf, int *clock, char **fname, int *chunk_size, int 
     *offset = atoi(strtok(NULL, " "));
     return strtok(NULL, "\n");
 }
+
 // print statistics gathered
 void print_statistics(ArrayList *statistics) {
     if(!statistics || statistics->size_elements != sizeof(stat_block))
@@ -940,14 +943,28 @@ void change_chunk_size(int *chunk_size) {
 // send a bye message to every peer in list
 void bye_peers(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers) {
     for(int i = 0; i < peers->count; i++) {
-        if(((peer *)peers->elements)[i].status == ONLINE) {
+        peer neighbour = ((peer*)peers->elements)[i];
+        if(neighbour.status == ONLINE) {
             update_clock(server, clock_lock, 0);
             char *msg = build_message(server->con, server->p_clock, BYE, NULL);
-            if(!msg)
+            if(!msg) continue;
+            SOCKET server_soc = socket(AF_INET, SOCK_STREAM, 0);
+            if(is_invalid_sock(server_soc)) {
+                fprintf(stderr, "\nErro: Falha na criacao do socket");
+                show_soc_error();
                 continue;
-            SOCKET s = send_message(msg, &((peer *)peers->elements)[i], BYE);
-            if(!is_invalid_sock(s))
-                sock_close(s);
+            }
+            set_sock_block(server_soc, true);
+            if(connect(server_soc, (const struct sockaddr *)&(neighbour.con), sizeof(neighbour.con)) != 0) {
+                fprintf(stderr, "\nErro: Falha ao conectar ao peer\n");
+                show_soc_error();
+                sock_close(server_soc);
+                continue;
+            }
+            size_t len = strlen(msg);
+            send_complete(server_soc, msg, len + 1, 0);
+            SOCKET s = send_message(msg, &neighbour, BYE);
+            sock_close(s);
             free(msg);
         }
     }
