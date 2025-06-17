@@ -154,7 +154,7 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers, cons
         fprintf(stderr, "Erro: Falha ao acrescentar novo arquivo à lista\n");
         for(int i = 0; i < files->count; i++)
             free(((ls_files *)files->elements)[i].file.fname);
-        free(((ls_files *)files->elements));
+        free_list(files);
         free(file_path);
         fclose(new_file);
         return;
@@ -259,7 +259,7 @@ void send_file(peer *server, pthread_mutex_t *clock_lock, char *buf, SOCKET con,
     fargs->contentb64 = encoded;
     char *msg = build_message(server->con, server->p_clock, FILEMSG, (void *)fargs);
     if(msg) {
-        printf("\tEncaminhando mensagem \"%.*s\" para %s:%d\n", (int)MAX(strcspn(msg, "\n"), MSG_SIZE), msg, inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port));
+        printf("\tEncaminhando mensagem \"%.*s\" para %s:%d\n", (int)MIN(strcspn(msg, "\n"), MSG_SIZE), msg, inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port));
         send_complete(con, msg, strlen(msg) + 1, 0);
     }
     sock_close(con);
@@ -676,7 +676,7 @@ void *download_file_thread(void *args) {
         }
         buf[total_received] = 0;
         printf("\n");
-        printf("\nResposta recebida:  \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
+        printf("\nResposta recebida:  \"%.*s\"\n", (int)MIN(strcspn(buf, "\n"), MSG_SIZE), buf);
 
         int rec_chunk, soffset;
         int clock = 0;
@@ -699,6 +699,7 @@ void *download_file_thread(void *args) {
         int decode_size = base64_decode(file_decoded, file_b64);
         fseek(file, offset * chunk, SEEK_SET);
         fwrite(file_decoded, 1, decode_size, file);
+        free(file_b64);
         free(file_decoded);
         round++;
         offset += round * threads_size;
@@ -943,23 +944,23 @@ void change_chunk_size(int *chunk_size) {
 
 // send a bye message to every peer in list
 void bye_peers(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers) {
+    SOCKET server_soc = socket(AF_INET, SOCK_STREAM, 0);
+    if(is_invalid_sock(server_soc)) {
+        fprintf(stderr, "\nErro: Falha na criacao do socket");
+        show_soc_error();
+        return;
+    }
+    set_sock_block(server_soc, true);
     for(int i = 0; i < peers->count; i++) {
         peer neighbour = ((peer*)peers->elements)[i];
         if(neighbour.status == ONLINE) {
             update_clock(server, clock_lock, 0);
             char *msg = build_message(server->con, server->p_clock, BYE, NULL);
             if(!msg) continue;
-            SOCKET server_soc = socket(AF_INET, SOCK_STREAM, 0);
-            if(is_invalid_sock(server_soc)) {
-                fprintf(stderr, "\nErro: Falha na criacao do socket");
-                show_soc_error();
-                continue;
-            }
-            set_sock_block(server_soc, true);
             if(connect(server_soc, (const struct sockaddr *)&(neighbour.con), sizeof(neighbour.con)) != 0) {
                 fprintf(stderr, "\nErro: Falha ao conectar ao peer\n");
                 show_soc_error();
-                sock_close(server_soc);
+                free(msg);
                 continue;
             }
             size_t len = strlen(msg);
@@ -969,4 +970,5 @@ void bye_peers(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers) {
             free(msg);
         }
     }
+    sock_close(server_soc);
 }

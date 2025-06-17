@@ -30,7 +30,10 @@ void *treat_request(void *args)
 
     if (valread <= 0 && !should_quit)
     {
-        fprintf(stderr, "\nErro: Falha lendo mensagem de vizinho\n");
+        perror("Erro: Falha lendo mensagem de vizinho\n");
+        free(args);
+        sock_close(n_sock);
+        free(buf);
         return NULL;
     }
 
@@ -261,6 +264,9 @@ int main(int argc, char **argv)
     for (int i = 0; i < files->count; i++)
         free(((char **)files->elements)[i]);
     free_list(files);
+    for(int i = 0; i < statistics->count; i++)
+        free_list(((stat_block*)statistics->elements)[i].times)
+    free_list(statistics);
 #ifdef WIN
     WSACleanup();
 #endif

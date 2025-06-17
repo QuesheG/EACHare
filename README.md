@@ -32,3 +32,7 @@ This product includes software developed by the Apache Group for use in the Apac
 - fix send
 - fix append list files same filename
 - fix memory leak
+
+## ERROS:
+- envio e recebimento : após escrita no arquivo para criar dummy (arquivo cheio de zeros), há partes que não estão sendo sobrescritas
+- tratar erros de socket de forma a tentar graciosamente de novo
