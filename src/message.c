@@ -113,6 +113,13 @@ void share_peers_list(peer *server, pthread_mutex_t *clock_lock, SOCKET soc, pee
     free(msg);
 }
 
+bool file_in_list(char **files, size_t len, char *nf) {
+    for(int i = 0; i < len; i++) {
+        if(strcmp(files[i], nf) == 0) return true;
+    }
+    return false;
+}
+
 // asks for files of all peers
 void get_files(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers, const char *dir_path, ArrayList *files_list, int size_chunk, ArrayList *statistics) {
     ArrayList *files = receive_files(server, clock_lock, peers);
@@ -140,8 +147,9 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers, cons
     char *file_path = dir_file_path(dir_path, chosen_file.file.fname);
     FILE *new_file = fopen(file_path, "wb");
     if(!new_file) {
-        fprintf(stderr, "Erro: Falha abrindo arquivo");
+        perror("Erro: Falha abrindo arquivo");
         free(file_path);
+        free(files);
         return;
     }
     make_file_size(new_file, chosen_file.file.fsize);
@@ -159,7 +167,8 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers, cons
         free(file_path);
         return;
     }
-    append_element(files_list, (void *)&n_entry);
+    if(!file_in_list((char **)files->elements, files->count, n_entry))
+        append_element(files_list, (void *)&n_entry);
     for(int i = 0; i < files->count; i++) {
         free(((ls_files *)files->elements)[i].file.fname);
         free_list(((ls_files *)files->elements)[i].holders);
@@ -539,6 +548,7 @@ ArrayList *receive_files(peer *server, pthread_mutex_t *clock_lock, ArrayList *p
         }
         peer sender;
         MSG_TYPE msg_type = read_message(buf, &sender);
+        sender.status = ONLINE;
 
         size_t rec_files_size = 0;
         char *temp = check_msg_full(buf, req, msg_type, (void *)&rec_files_size, &valread);
@@ -640,14 +650,15 @@ void *download_file_thread(void *args) {
         SOCKET req = send_message(msg, &(req_peer));
         if(is_invalid_sock(req)) {
             fprintf(stderr, "\nErro: Falha com socket\n");
+            show_soc_error();
             free(msg);
             continue;
         }
         free(msg);
-        size_t temp_size = MSG_SIZE + 26 + base64encode_len(chunk);
-        char *buf = calloc(temp_size + 1, sizeof(char));
+        size_t temp_size = MSG_SIZE + 26 + base64encode_len(chunk) + 1;
+        char *buf = calloc(temp_size, sizeof(char));
         if(!buf) {
-            fprintf(stderr, "\nErro: Falha na alocacao de recebimento!\n");
+            perror("\nErro: Falha na alocacao de recebimento ao requisitar %d\n");
             sock_close(req);
             continue;
         }
@@ -676,6 +687,7 @@ void *download_file_thread(void *args) {
                 break;
         }
         buf[total_received] = 0;
+        sock_close(req);
         printf("\n");
         printf("\nResposta recebida:  \"%.*s\"\n", (int)MIN(strcspn(buf, "\n"), MSG_SIZE), buf);
 
@@ -697,6 +709,7 @@ void *download_file_thread(void *args) {
         char *file_decoded = malloc(sizeof(char) * (clen + 1));
         if(!file_decoded) {
             fprintf(stderr, "Erro: Falha na alocacao\n");
+            free(file_b64);
             continue;
         }
         int decode_size = base64_decode(file_decoded, file_b64);
@@ -740,7 +753,7 @@ double get_std_deviation(double *list, size_t list_size, double avrg) {
 }
 
 void download_file(peer *server, pthread_mutex_t *clock_lock, ls_files chosen_file, const char *dir_path, size_t size_chunk, ArrayList *statistics) {
-    char size_thread_pool = 8;
+    char size_thread_pool = 4;
     pthread_t *thread_pool = malloc(sizeof(pthread_t) * size_thread_pool);
     clock_t init = clock();
     for(int i = 0; i < size_thread_pool; i++) {
