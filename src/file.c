@@ -3,6 +3,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <dirent.h>
+#ifdef WIN
+#include <io.h>
+#else
+#include <unistd.h>
+#endif
 #include <stdbool.h>
 
 //read file with peers' ips and return them in text form
@@ -119,4 +124,15 @@ int fsize(const char *file) {
     int sz=ftell(fp);
     fclose(fp);
     return sz;
+}
+
+bool make_file_size(FILE *fp, uint64_t fsize) {
+    int res = 0;
+    #ifdef WIN
+    res = _chsize_s(fileno(fp), fsize);
+    #else
+    res = ftruncate(fileno(fp), fsize);
+    #endif
+    if(res < 0) perror("Erro: Falha criando arquivo");
+    return res == 0;
 }

@@ -100,7 +100,7 @@ void share_files_list(peer *server, pthread_mutex_t *clock_lock, SOCKET con, pee
 int send_complete(SOCKET sock, const void *buf, size_t len, int flag); // send full message
 void send_file(peer *server, pthread_mutex_t *clock_lock, char *buf, SOCKET con, peer sender, char *dir_path); // send file
 char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *args); // create a message with the sender ip, its clock and the message type
-SOCKET send_message(const char *msg, peer *neighbour, MSG_TYPE msg_type); // send a built message to an known peer socket
+SOCKET send_message(const char *msg, peer *neighbour); // send a built message to an known peer socket
 MSG_TYPE read_message(const char *buf, peer *sender); // read message, mark its sender and return the message type
 char *check_msg_full(const char *buf, SOCKET sock, MSG_TYPE msg_type, void *args, ssize_t *valread); // check if message received was read fully
 ArrayList *receive_files(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers); // receive messages for files
