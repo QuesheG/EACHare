@@ -160,8 +160,10 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers, cons
         return;
     }
     append_element(files_list, (void *)&n_entry);
-    for(int i = 0; i < files->count; i++)
+    for(int i = 0; i < files->count; i++) {
         free(((ls_files *)files->elements)[i].file.fname);
+        free_list(((ls_files *)files->elements)[i].holders);
+    }
     free_list(files);
     free(file_path);
     fclose(new_file);

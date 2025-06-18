@@ -265,7 +265,7 @@ int main(int argc, char **argv)
         free(((char **)files->elements)[i]);
     free_list(files);
     for(int i = 0; i < statistics->count; i++)
-        free_list(((stat_block*)statistics->elements)[i].times)
+        free_list(((stat_block*)statistics->elements)[i].times);
     free_list(statistics);
 #ifdef WIN
     WSACleanup();
