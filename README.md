@@ -30,6 +30,9 @@ This product includes software developed by the Apache Group for use in the Apac
 
 ## TODO:
 - fix append list files same filename
+
 - fix thread num (testar numero de threads e tempo com diferentes arquivos e peers)
+
 - fix tratamento de erros
+
 - fix listen_thread mem leak
