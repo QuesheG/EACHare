@@ -29,13 +29,7 @@ python testing.py
 This product includes software developed by the Apache Group for use in the Apache HTTP server project (http://www.apache.org/).
 
 ## TODO:
-- fix send
 - fix append list files same filename
-- fix memory leak
-
-## ERROS:
-- 1: ultima escrita no arquivo está sendo feita com tamanho além do necessário
-- 2: arquivo 2 não está sendo escrito
-- 3: ultima_s_ escritas no arquivo não estão ocorrendo (?)
-- envio e recebimento : após escrita no arquivo para criar dummy (arquivo cheio de zeros), há partes que não estão sendo sobrescritas
-- tratar erros de socket de forma a tentar graciosamente de novo
+- fix thread num (testar numero de threads e tempo com diferentes arquivos e peers)
+- fix tratamento de erros
+- fix listen_thread mem leak

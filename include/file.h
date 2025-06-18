@@ -11,5 +11,6 @@ char ** get_dir_files(const char *dir, size_t *len); //store name of every file 
 void show_files(ArrayList *files); //list filenames in memory
 char *dir_file_path(const char *dir_path, const char *file_name); //append file_name to dir_path to get the entire path
 int fsize(const char *file); //get size of file
+bool make_file_size(FILE *fp, uint64_t fsize); //make the file pointed by fp
 
 #endif
