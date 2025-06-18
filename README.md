@@ -34,5 +34,8 @@ This product includes software developed by the Apache Group for use in the Apac
 - fix memory leak
 
 ## ERROS:
+- 1: ultima escrita no arquivo está sendo feita com tamanho além do necessário
+- 2: arquivo 2 não está sendo escrito
+- 3: ultima_s_ escritas no arquivo não estão ocorrendo (?)
 - envio e recebimento : após escrita no arquivo para criar dummy (arquivo cheio de zeros), há partes que não estão sendo sobrescritas
 - tratar erros de socket de forma a tentar graciosamente de novo

@@ -44,7 +44,7 @@ void show_peers(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers) {
             fprintf(stderr, "Erro: Falha na construcao da mensagem!\n");
             return;
         }
-        SOCKET s = send_message(msg, &(((peer *)peers->elements)[input - 1]), HELLO);
+        SOCKET s = send_message(msg, &(((peer *)peers->elements)[input - 1]));
         sock_close(s);
         free(msg);
     }
@@ -64,7 +64,7 @@ void get_peers(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers /*, c
             perror("Erro: Falha na construcao da mensagem!\n");
             return;
         }
-        SOCKET req = send_message(msg, &(((peer *)peers->elements)[i]), GET_PEERS);
+        SOCKET req = send_message(msg, &(((peer *)peers->elements)[i]));
         if(is_invalid_sock(req)) {
             free(msg);
             continue;
@@ -160,8 +160,10 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers, cons
         return;
     }
     append_element(files_list, (void *)&n_entry);
-    for(int i = 0; i < files->count; i++)
+    for(int i = 0; i < files->count; i++) {
         free(((ls_files *)files->elements)[i].file.fname);
+        free_list(((ls_files *)files->elements)[i].holders);
+    }
     free_list(files);
     free(file_path);
     fclose(new_file);
@@ -356,7 +358,7 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
 }
 
 // send a built message to an known peer socket
-SOCKET send_message(const char *msg, peer *neighbour, MSG_TYPE msg_type) {
+SOCKET send_message(const char *msg, peer *neighbour) {
     if(!msg) {
         fprintf(stderr, "\nErro: Mensagem de envio vazia!\n");
         return INVALID_SOCKET;
@@ -523,7 +525,7 @@ ArrayList *receive_files(peer *server, pthread_mutex_t *clock_lock, ArrayList *p
             free_list(files);
             return NULL;
         }
-        SOCKET req = send_message(msg, &(((peer *)peers->elements)[i]), LS);
+        SOCKET req = send_message(msg, &(((peer *)peers->elements)[i]));
         if(is_invalid_sock(req)) {
             free(msg);
             continue;
@@ -636,7 +638,7 @@ void *download_file_thread(void *args) {
         free(dargs);
         if(!msg)
             continue;
-        SOCKET req = send_message(msg, &(req_peer), DL);
+        SOCKET req = send_message(msg, &(req_peer));
         if(is_invalid_sock(req)) {
             fprintf(stderr, "\nErro: Falha com socket\n");
             free(msg);
@@ -675,6 +677,7 @@ void *download_file_thread(void *args) {
                 break;
         }
         buf[total_received] = 0;
+        //FIXME: TODO: realloc buf to fit chunk_content nicely
         printf("\n");
         printf("\nResposta recebida:  \"%.*s\"\n", (int)MIN(strcspn(buf, "\n"), MSG_SIZE), buf);
 
@@ -702,7 +705,7 @@ void *download_file_thread(void *args) {
         free(file_b64);
         free(file_decoded);
         round++;
-        offset += round * threads_size;
+        offset = id + (round * threads_size);
     }
     fclose(file);
     free(a);
@@ -737,7 +740,7 @@ double get_std_deviation(double *list, size_t list_size, double avrg) {
 }
 
 void download_file(peer *server, pthread_mutex_t *clock_lock, ls_files chosen_file, const char *dir_path, size_t size_chunk, ArrayList *statistics) {
-    char size_thread_pool = 8;
+    char size_thread_pool = 1;
     pthread_t *thread_pool = malloc(sizeof(pthread_t) * size_thread_pool);
     clock_t init = clock();
     for(int i = 0; i < size_thread_pool; i++) {
@@ -965,7 +968,7 @@ void bye_peers(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers) {
             }
             size_t len = strlen(msg);
             send_complete(server_soc, msg, len + 1, 0);
-            SOCKET s = send_message(msg, &neighbour, BYE);
+            SOCKET s = send_message(msg, &neighbour);
             sock_close(s);
             free(msg);
         }
