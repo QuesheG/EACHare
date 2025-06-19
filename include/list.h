@@ -18,5 +18,6 @@ void append_element(ArrayList *list, void *new_element);
 void append_many(ArrayList *list, void *elements, size_t elements_count, size_t elements_size);
 ArrayList *concat_lists(ArrayList *l1, ArrayList *l2);
 bool is_list_empty(ArrayList list);
+void remove_at(ArrayList list, size_t pos);
 void free_list(ArrayList *list);
 #endif

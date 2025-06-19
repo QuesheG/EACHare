@@ -637,7 +637,12 @@ void *download_file_thread(void *args) {
     FILE *file = fopen(file_path, "wb");
     free(file_path);
     peer *holders = (peer *)nfile.holders->elements;
+    uint8_t patience = 0;
     while(offset * chunk < nfile.file.fsize) {
+        if(patience == 6) {
+            remove_at(nfile.holders, (id + (round * threads_size)) % nfile.holders->count);
+        }
+        if(nfile.holders->count == 0) return;
         peer req_peer = holders[(id + (round * threads_size)) % nfile.holders->count];
         dl_msg_args *dargs = malloc(sizeof(*dargs));
         dargs->chunk_size = chunk;
@@ -653,6 +658,7 @@ void *download_file_thread(void *args) {
             fprintf(stderr, "\nErro: Falha com socket\n");
             show_soc_error();
             free(msg);
+            patience++;
             continue;
         }
         free(msg);
@@ -671,6 +677,7 @@ void *download_file_thread(void *args) {
                 show_soc_error();
                 free(buf);
                 buf = 0;
+                patience++;
                 break;
             }
             if(!valread)
@@ -697,6 +704,7 @@ void *download_file_thread(void *args) {
         if(strlen(buf) < 15) {
             free(buf);
             sock_close(req);
+            patience++;
             continue;
         }
 
@@ -727,6 +735,7 @@ void *download_file_thread(void *args) {
         free(file_b64);
         free(file_decoded);
         round++;
+        patience = 0;
         offset = id + (round * threads_size);
     }
     fclose(file);
@@ -891,6 +900,7 @@ char *get_file_in_msg(char *buf, int *clock, char **fname, int *chunk_size, int 
     *clock = atoi(cls); // clock
     strtok(NULL, " ");                // type
     char *infos = strtok(NULL, "\n");
+    if(!infos) return NULL;
     char *n = strtok(infos, " ");
     if(fname && n)
         *fname = strdup(n);
