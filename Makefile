@@ -9,7 +9,7 @@ OBJ_FILES = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_FILES))
 
 FINAL = eachare
 
-CFLAGS = -g -Wall -I$(INC_DIR)
+CFLAGS = -g3 -Wall -I$(INC_DIR)
 
 ifeq ($(OS), Windows_NT)
 LDFLAGS = -lws2_32 -lpthread

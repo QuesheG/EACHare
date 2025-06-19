@@ -167,8 +167,9 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers, cons
         free(file_path);
         return;
     }
-    if(!file_in_list((char **)files->elements, files->count, n_entry))
+    if(!file_in_list((char **)files_list->elements, files->count, n_entry))
         append_element(files_list, (void *)&n_entry);
+    free(n_entry);
     for(int i = 0; i < files->count; i++) {
         free(((ls_files *)files->elements)[i].file.fname);
         free_list(((ls_files *)files->elements)[i].holders);
@@ -665,16 +666,15 @@ void *download_file_thread(void *args) {
         ssize_t total_received = 0;
         while(total_received < temp_size) {
             ssize_t valread = recv(req, buf + total_received, temp_size - total_received, 0);
-            
             if(valread < 0) {
                 fprintf(stderr, "\nErro: Falha no recebimento\n");
                 show_soc_error();
                 free(buf);
+                buf = 0;
                 break;
             }
             if(!valread)
                 break;
-            
             bool done = false;
             for(int i = 0; i < valread; i++) {
                 if(buf[total_received + i] == '\n') {
@@ -683,13 +683,22 @@ void *download_file_thread(void *args) {
                 }
             }
             total_received += valread;
-            if(done) 
+            if(done)
                 break;
+        }
+        if(!buf) {
+            sock_close(req);
+            continue;
         }
         buf[total_received] = 0;
         sock_close(req);
         printf("\n");
-        printf("\nResposta recebida:  \"%.*s\"\n", (int)MIN(strcspn(buf, "\n"), MSG_SIZE), buf);
+        printf("\n\tResposta recebida:  \"%.*s\"\n", (int)MIN(strcspn(buf, "\n"), MSG_SIZE), buf);
+        if(strlen(buf) < 15) {
+            free(buf);
+            sock_close(req);
+            continue;
+        }
 
         int rec_chunk, soffset;
         int clock = 0;
@@ -875,8 +884,11 @@ void append_files_list(const char *buf, ArrayList *list, peer sender, size_t rec
 
 // return the file in base64 format
 char *get_file_in_msg(char *buf, int *clock, char **fname, int *chunk_size, int *offset) {
+    if(!buf) return NULL;
     strtok(buf, " ");                 // ip
-    *clock = atoi(strtok(NULL, " ")); // clock
+    char *cls = strtok(NULL, " ");
+    if(!cls) return NULL;
+    *clock = atoi(cls); // clock
     strtok(NULL, " ");                // type
     char *infos = strtok(NULL, "\n");
     char *n = strtok(infos, " ");
@@ -974,8 +986,8 @@ void bye_peers(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers) {
             char *msg = build_message(server->con, server->p_clock, BYE, NULL);
             if(!msg) continue;
             if(connect(server_soc, (const struct sockaddr *)&(neighbour.con), sizeof(neighbour.con)) != 0) {
-                fprintf(stderr, "\nErro: Falha ao conectar ao peer\n");
-                show_soc_error();
+                //fprintf(stderr, "\nErro: Falha ao conectar ao peer\n");
+                //show_soc_error();
                 free(msg);
                 continue;
             }

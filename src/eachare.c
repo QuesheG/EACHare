@@ -28,7 +28,7 @@ void *treat_request(void *args)
 
     ssize_t valread = recv(n_sock, buf, MSG_SIZE - 1, 0);
 
-    if (valread <= 0 && !should_quit)
+    if (valread <= 0)
     {
         perror("Erro: Falha lendo mensagem de vizinho\n");
         free(args);
@@ -109,34 +109,27 @@ void *listen_socket(void *args)
 
     int opt = 1;
     SOCKET server_soc;
-    if (!create_server(&server_soc, server->con, opt))
-    {
+    if (!create_server(&server_soc, server->con, opt)) {
         fprintf(stderr, "\nErro: Falha com criacao de server\n");
         show_soc_error();
         return NULL;
     }
-    if (listen(server_soc, 3) != 0)
-    {
+    set_sock_block(server_soc, true);
+    if (listen(server_soc, 3) != 0) {
         fprintf(stderr, "\nErro: Falha colocando socket para escutar\n");
         show_soc_error();
         return NULL;
     }
-    while (!should_quit)
-    {
+    while (!should_quit) {
         SOCKET n_sock = accept(server_soc, (struct sockaddr *)&(client.con), &addrlen);
-        if (is_invalid_sock(n_sock) && !should_quit)
-        {
-            fprintf(stderr, "\nErro: Falha aceitando socket de conexao\n");
-        }
-        if (should_quit)
-            return NULL;
-
+        if (is_invalid_sock(n_sock))
+            continue;
         pthread_t response_thread;
         listen_args *l_args = send_args(server, peers, /*file,*/ n_sock, dir_path);
         pthread_create(&response_thread, NULL, treat_request, (void *)l_args);
         pthread_detach(response_thread);
     }
-    sock_close(server_soc); //TODO: tirar responsabilidade da thread
+    sock_close(server_soc);
     free(args);
     pthread_exit(NULL);
     return NULL;
@@ -250,6 +243,7 @@ int main(int argc, char **argv)
             printf("Saindo...\n");
             should_quit = true;
             pthread_cancel(listener_thread);
+            pthread_join(listener_thread, NULL);
             break;
         default:
             printf("Comando inesperado\n");
@@ -258,6 +252,7 @@ int main(int argc, char **argv)
     }
 
     bye_peers(server, &clock_lock, peers);
+    if(args) free(args);
     pthread_mutex_destroy(&clock_lock);
     free(server);
     free_list(peers);
