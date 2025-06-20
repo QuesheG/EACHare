@@ -19,8 +19,9 @@ bool is_same_peer(peer a, peer b)
 void create_address(peer *address, const char *ip, uint64_t clock)
 {
     char *ip_cpy = strdup(ip);
-    char *tokip = strtok(ip_cpy, ":");
-    char *tokport = strtok(NULL, ":");
+    char *svptr;
+    char *tokip = strtok_r(ip_cpy, ":", &svptr);
+    char *tokport = strtok_r(svptr, ":", &svptr);
     if(!tokip || !tokport) {
         free(ip_cpy);
         return;
@@ -96,11 +97,12 @@ int peer_in_list(peer a, peer *neighbours, size_t peers_size)
 // append received list to known peer list
 void append_list_peers(const char *buf, ArrayList *peers, size_t rec_peers_size /*, char *file*/) {
     char *cpy = strdup(buf);
-    strtok(cpy, " ");  // ip
-    strtok(NULL, " "); // clock
-    strtok(NULL, " "); // type
-    strtok(NULL, " "); // size
-    char *list = strtok(NULL, "\n");
+    char *svptr = cpy;
+    strtok_r(svptr, " ", &svptr);  // ip
+    strtok_r(svptr, " ", &svptr); // clock
+    strtok_r(svptr, " ", &svptr); // type
+    strtok_r(svptr, " ", &svptr); // size
+    char *list = strtok_r(svptr, "\n", &svptr);
 
     if(!list) {
         fprintf(stderr, "Lista de peers vazia!\n");
@@ -119,13 +121,11 @@ void append_list_peers(const char *buf, ArrayList *peers, size_t rec_peers_size 
     size_t info_count = 0;
     for(int i = 0; i < rec_peers_size; i++, info_count++) {
         char *cpy_l = strdup(list);
-        for(int j = 0; j <= info_count; j++) {
-            if (j == 0)
-                p = strtok(cpy_l, " ");
-            else
-                p = strtok(NULL, " ");
-        }
-        char *infon = strtok(p, ":");
+        svptr = cpy_l;
+        for(int j = 0; j <= info_count; j++)
+            p = strtok_r(svptr, " ", &svptr);
+        svptr = p;
+        char *infon = strtok_r(svptr, ":", &svptr);
         if(!infon) break;
         for(int j = 0; j < 4; j++) {// hardcoding infos size :D => ip1:port2:status3:num4
             if(!infon) break;
@@ -141,7 +141,7 @@ void append_list_peers(const char *buf, ArrayList *peers, size_t rec_peers_size 
             }
             if (j == 3)
                 rec_peers_list[i].p_clock = atoi(infon);
-            infon = strtok(NULL, ":");
+            infon = strtok_r(svptr, ":", &svptr);
         }
 
         bool add = true;
@@ -173,3 +173,49 @@ void update_clock(peer *a, pthread_mutex_t *clock_lock, uint64_t n_clock)
     pthread_mutex_unlock(clock_lock);
     printf("\t=> Atualizando relogio para %" PRIu64 "\n", a->p_clock);
 }
+
+#ifdef WIN
+/* 
+ * public domain strtok_r() by Charlie Gordon
+ *
+ *   from comp.lang.c  9/14/2007
+ *
+ *      http://groups.google.com/group/comp.lang.c/msg/2ab1ecbb86646684
+ *
+ *     (Declaration that it's public domain):
+ *      http://groups.google.com/group/comp.lang.c/msg/7c7b39328fefab9c
+ */
+
+char* strtok_r(
+    char *str, 
+    const char *delim, 
+    char **nextp)
+{
+    char *ret;
+
+    if (str == NULL)
+    {
+        str = *nextp;
+    }
+
+    str += strspn(str, delim);
+
+    if (*str == '\0')
+    {
+        return NULL;
+    }
+
+    ret = str;
+
+    str += strcspn(str, delim);
+
+    if (*str)
+    {
+        *str++ = '\0';
+    }
+
+    *nextp = str;
+
+    return ret;
+}
+#endif

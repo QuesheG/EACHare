@@ -423,18 +423,19 @@ MSG_TYPE read_message(const char *buf, peer *sender) {
     if(!buf_cpy)
         return UNEXPECTED_MSG_TYPE;
     strncpy(buf_cpy, buf, MSG_SIZE);
-    char *tok_ip = strtok(buf_cpy, " ");
+    char *svptr = buf_cpy;
+    char *tok_ip = strtok_r(svptr, " ", &svptr);
     if(!tok_ip) {
         free(buf_cpy);
         return UNEXPECTED_MSG_TYPE;
     }
-    char *cls = strtok(NULL, " ");
+    char *cls = strtok_r(svptr, " ", &svptr);
     if(!cls) {
         free(buf_cpy);
         return UNEXPECTED_MSG_TYPE;
     }
     int aclock = atoi(cls);
-    char *tok_msg = strtok(NULL, " ");
+    char *tok_msg = strtok_r(svptr, " ", &svptr);
 
     if(tok_msg) {
         tok_msg[strcspn(tok_msg, "\n")] = '\0';
@@ -856,11 +857,12 @@ void download_file(peer *server, pthread_mutex_t *clock_lock, ls_files chosen_fi
 // append list received to known list
 void append_files_list(const char *buf, ArrayList *list, peer sender, size_t rec_files_len) {
     char *cpy = strdup(buf);
-    strtok(cpy, " ");  // ip
-    strtok(NULL, " "); // clock
-    strtok(NULL, " "); // type
-    strtok(NULL, " "); // size
-    char *list_rec = strtok(NULL, "\n");
+    char *svptr = cpy;
+    strtok_r(svptr, " ", &svptr);  // ip
+    strtok_r(svptr, " ", &svptr); // clock
+    strtok_r(svptr, " ", &svptr); // type
+    strtok_r(svptr, " ", &svptr); // size
+    char *list_rec = strtok_r(svptr, "\n", &svptr);
 
     if(!list_rec) {
         fprintf(stderr, "Erro: Lista de arquivos nao encontrada!\n");
@@ -877,14 +879,12 @@ void append_files_list(const char *buf, ArrayList *list, peer sender, size_t rec
 
     for(int i = 0; i < rec_files_len; i++) {
         char *cpy_l = strdup(list_rec);
-        for(int j = 0; j <= i; j++) {
-            if(j == 0)
-                p = strtok(cpy_l, " ");
-            else
-                p = strtok(NULL, " ");
-        }
-        char *infoname = strtok(p, ":");
-        char *infosize = strtok(NULL, "\0");
+        char *svptr = cpy_l;
+        for(int j = 0; j <= i; j++)
+            p = strtok_r(svptr, " ", &svptr);
+        svptr = p;
+        char *infoname = strtok_r(svptr, ":", &svptr);
+        char *infosize = strtok_r(svptr, "\0", &svptr);
         int position;
 
         if(first_iteration) {
@@ -931,24 +931,37 @@ void append_files_list(const char *buf, ArrayList *list, peer sender, size_t rec
 // return the file in base64 format
 char *get_file_in_msg(char *buf, int *clock, char **fname, int *chunk_size, int*offset) {
     //ip clock type name chunk offset content
-    char *saveptr1, *saveptr2;
     char *bcpy = strdup(buf);
-    strtok_r(bcpy, " ", &saveptr1);           // ip
-    char *cls = strtok_r(NULL, " ", &saveptr1);
-    if (!cls) { free(bcpy); return NULL; }
+    char *svptr = bcpy;
+    strtok_r(svptr, " ", &svptr);           // ip
+    char *cls = strtok_r(svptr, " ", &svptr);
+    if (!cls) {
+        free(bcpy);
+        return NULL;
+    }
     *clock = atoi(cls);
-    strtok_r(NULL, " ", &saveptr1);           // type
-    char *infos = strtok_r(NULL, "\n", &saveptr1);
-    if (!infos) { free(bcpy); return NULL; }
-    char *n = strtok_r(infos, " ", &saveptr2);
+    strtok_r(svptr, " ", &svptr);           // type
+    char *infos = strtok_r(svptr, "\n", &svptr);
+    if (!infos) {
+        free(bcpy);
+        return NULL;
+    }
+    svptr = infos;
+    char *n = strtok_r(svptr, " ", &svptr);
     if (fname && n) *fname = strdup(n);
-    char *csl = strtok_r(NULL, " ", &saveptr2);
-    if (!csl) { free(bcpy); return NULL; }
+    char *csl = strtok_r(svptr, " ", &svptr);
+    if (!csl) {
+        free(bcpy);
+        return NULL;
+    }
     *chunk_size = atoi(csl);
-    char *ofs = strtok_r(NULL, " ", &saveptr2);
-    if (!ofs) { free(bcpy); return NULL; }
+    char *ofs = strtok_r(svptr, " ", &svptr);
+    if (!ofs) {
+        free(bcpy);
+        return NULL;
+    }
     *offset = atoi(ofs);
-    char *ret = strtok_r(NULL, "\n", &saveptr2);
+    char *ret = strtok_r(svptr, "\n", &svptr);
     if (ret) ret = strdup(ret);
     free(bcpy);
     return ret;
