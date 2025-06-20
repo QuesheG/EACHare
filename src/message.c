@@ -228,15 +228,30 @@ void share_files_list(peer *server, pthread_mutex_t *clock_lock, SOCKET con, pee
 
 // send file
 void send_file(peer *server, pthread_mutex_t *clock_lock, char *buf, SOCKET con, peer sender, char *dir_path) {
-    file_msg_args *fargs = malloc(sizeof(file_msg_args));
-    if(!fargs)
+    if(!dir_path) {
+        sock_close(con);
+        free(buf);
         return;
+    }
+    file_msg_args *fargs = malloc(sizeof(file_msg_args));
+    if(!fargs) {
+        sock_close(con);
+        free(buf);
+        return;
+    }
     int clock = 0;
     char *a = get_file_in_msg(buf, &clock, &(fargs->file_name), &(fargs->chunk_size), &(fargs->offset));
     if(a)
         free(a);
+    free(buf);
+    if(!fargs->file_name) {
+        free(fargs);
+        sock_close(con);
+        return;
+    }
     char *file_path = dir_file_path(dir_path, fargs->file_name);
     if(!file_path) {
+        sock_close(con);
         free(fargs);
         return;
     }
@@ -271,7 +286,7 @@ void send_file(peer *server, pthread_mutex_t *clock_lock, char *buf, SOCKET con,
     char *msg = build_message(server->con, server->p_clock, FILEMSG, (void *)fargs);
     if(msg) {
         printf("\tEncaminhando mensagem \"%.*s\" para %s:%d\n", (int)MIN(strcspn(msg, "\n"), MSG_SIZE), msg, inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port));
-        send_complete(con, msg, strlen(msg) + 1, 0);
+        send_complete(con, msg, strlen(msg) + 1, 0); //FIXME: HELP
     }
     sock_close(con);
     fclose(file);
@@ -408,32 +423,43 @@ MSG_TYPE read_message(const char *buf, peer *sender) {
     if(!buf_cpy)
         return UNEXPECTED_MSG_TYPE;
     strncpy(buf_cpy, buf, MSG_SIZE);
-    char *tok_ip = strtok(buf_cpy, " ");
-    int aclock = atoi(strtok(NULL, " "));
-    char *tok_msg = strtok(NULL, " ");
+    char *svptr = buf_cpy;
+    char *tok_ip = strtok_r(svptr, " ", &svptr);
+    if(!tok_ip) {
+        free(buf_cpy);
+        return UNEXPECTED_MSG_TYPE;
+    }
+    char *cls = strtok_r(svptr, " ", &svptr);
+    if(!cls) {
+        free(buf_cpy);
+        return UNEXPECTED_MSG_TYPE;
+    }
+    int aclock = atoi(cls);
+    char *tok_msg = strtok_r(svptr, " ", &svptr);
 
     if(tok_msg) {
         tok_msg[strcspn(tok_msg, "\n")] = '\0';
     }
     create_address(sender, tok_ip, aclock);
     MSG_TYPE ret_msg_type = UNEXPECTED_MSG_TYPE;
-    if(strcmp(tok_msg, "HELLO") == 0)
+    if(!tok_msg);
+    else if(strcmp(tok_msg, "HELLO") == 0)
         ret_msg_type = HELLO;
-    if(strcmp(tok_msg, "GET_PEERS") == 0)
+    else if(strcmp(tok_msg, "GET_PEERS") == 0)
         ret_msg_type = GET_PEERS;
-    if(strcmp(tok_msg, "PEER_LIST") == 0)
+    else if(strcmp(tok_msg, "PEER_LIST") == 0)
         ret_msg_type = PEER_LIST;
-    if(strcmp(tok_msg, "LS") == 0)
+    else if(strcmp(tok_msg, "LS") == 0)
         ret_msg_type = LS;
-    if(strcmp(tok_msg, "LS_LIST") == 0)
+    else if(strcmp(tok_msg, "LS_LIST") == 0)
         ret_msg_type = LS_LIST;
-    if(strcmp(tok_msg, "DL") == 0)
+    else if(strcmp(tok_msg, "DL") == 0)
         ret_msg_type = DL;
-    if(strcmp(tok_msg, "FILE") == 0)
+    else if(strcmp(tok_msg, "FILE") == 0)
         ret_msg_type = FILEMSG;
-    if(strcmp(tok_msg, "BYE") == 0)
+    else if(strcmp(tok_msg, "BYE") == 0)
         ret_msg_type = BYE;
-    free(buf_cpy);
+    if(buf_cpy) free(buf_cpy);
     return ret_msg_type;
 }
 
@@ -637,8 +663,23 @@ void *download_file_thread(void *args) {
     FILE *file = fopen(file_path, "wb");
     free(file_path);
     peer *holders = (peer *)nfile.holders->elements;
+    uint8_t patience = 0;
     while(offset * chunk < nfile.file.fsize) {
-        peer req_peer = holders[(id + (round * threads_size)) % nfile.holders->count];
+        size_t ppos = 0;
+        if(nfile.holders->count > 0)
+            ppos = (id + (round * threads_size)) % nfile.holders->count;
+        else
+            return NULL;
+        if(patience == 6)
+            if(nfile.holders->count > 0)
+                remove_at(nfile.holders, ppos);
+        if(nfile.holders->count == 0) {
+            fclose(file);
+            free(a);
+            pthread_exit(NULL);
+            return NULL;
+        }
+        peer req_peer = holders[ppos];
         dl_msg_args *dargs = malloc(sizeof(*dargs));
         dargs->chunk_size = chunk;
         dargs->fname = nfile.file.fname;
@@ -653,6 +694,7 @@ void *download_file_thread(void *args) {
             fprintf(stderr, "\nErro: Falha com socket\n");
             show_soc_error();
             free(msg);
+            patience++;
             continue;
         }
         free(msg);
@@ -671,6 +713,7 @@ void *download_file_thread(void *args) {
                 show_soc_error();
                 free(buf);
                 buf = 0;
+                patience++;
                 break;
             }
             if(!valread)
@@ -697,6 +740,7 @@ void *download_file_thread(void *args) {
         if(strlen(buf) < 15) {
             free(buf);
             sock_close(req);
+            patience++;
             continue;
         }
 
@@ -727,6 +771,7 @@ void *download_file_thread(void *args) {
         free(file_b64);
         free(file_decoded);
         round++;
+        patience = 0;
         offset = id + (round * threads_size);
     }
     fclose(file);
@@ -748,6 +793,7 @@ double get_average_time(double *list, size_t list_size) {
     for(int i = 0; i < list_size; i++) {
         avrg += list[i];
     }
+    if(!list_size) return 0;
     avrg /= list_size;
     return avrg;
 }
@@ -757,6 +803,7 @@ double get_std_deviation(double *list, size_t list_size, double avrg) {
     for(int i = 0; i < list_size; i++) {
         var += (list[i] - avrg) * (list[i] - avrg);
     }
+    if(!list_size) return 0;
     var /= list_size;
     return sqrt(var);
 }
@@ -810,11 +857,12 @@ void download_file(peer *server, pthread_mutex_t *clock_lock, ls_files chosen_fi
 // append list received to known list
 void append_files_list(const char *buf, ArrayList *list, peer sender, size_t rec_files_len) {
     char *cpy = strdup(buf);
-    strtok(cpy, " ");  // ip
-    strtok(NULL, " "); // clock
-    strtok(NULL, " "); // type
-    strtok(NULL, " "); // size
-    char *list_rec = strtok(NULL, "\n");
+    char *svptr = cpy;
+    strtok_r(svptr, " ", &svptr);  // ip
+    strtok_r(svptr, " ", &svptr); // clock
+    strtok_r(svptr, " ", &svptr); // type
+    strtok_r(svptr, " ", &svptr); // size
+    char *list_rec = strtok_r(svptr, "\n", &svptr);
 
     if(!list_rec) {
         fprintf(stderr, "Erro: Lista de arquivos nao encontrada!\n");
@@ -831,14 +879,12 @@ void append_files_list(const char *buf, ArrayList *list, peer sender, size_t rec
 
     for(int i = 0; i < rec_files_len; i++) {
         char *cpy_l = strdup(list_rec);
-        for(int j = 0; j <= i; j++) {
-            if(j == 0)
-                p = strtok(cpy_l, " ");
-            else
-                p = strtok(NULL, " ");
-        }
-        char *infoname = strtok(p, ":");
-        char *infosize = strtok(NULL, "\0");
+        char *svptr = cpy_l;
+        for(int j = 0; j <= i; j++)
+            p = strtok_r(svptr, " ", &svptr);
+        svptr = p;
+        char *infoname = strtok_r(svptr, ":", &svptr);
+        char *infosize = strtok_r(svptr, "\0", &svptr);
         int position;
 
         if(first_iteration) {
@@ -883,23 +929,44 @@ void append_files_list(const char *buf, ArrayList *list, peer sender, size_t rec
 }
 
 // return the file in base64 format
-char *get_file_in_msg(char *buf, int *clock, char **fname, int *chunk_size, int *offset) {
-    if(!buf) return NULL;
-    strtok(buf, " ");                 // ip
-    char *cls = strtok(NULL, " ");
-    if(!cls) return NULL;
-    *clock = atoi(cls); // clock
-    strtok(NULL, " ");                // type
-    char *infos = strtok(NULL, "\n");
-    char *n = strtok(infos, " ");
-    if(fname && n)
-        *fname = strdup(n);
-    *chunk_size = atoi(strtok(NULL, " "));
-    *offset = atoi(strtok(NULL, " "));
-    char *ret = strtok(NULL, "\n");
-    if(ret) ret = strdup(ret);
+char *get_file_in_msg(char *buf, int *clock, char **fname, int *chunk_size, int*offset) {
+    //ip clock type name chunk offset content
+    char *bcpy = strdup(buf);
+    char *svptr = bcpy;
+    strtok_r(svptr, " ", &svptr);           // ip
+    char *cls = strtok_r(svptr, " ", &svptr);
+    if (!cls) {
+        free(bcpy);
+        return NULL;
+    }
+    *clock = atoi(cls);
+    strtok_r(svptr, " ", &svptr);           // type
+    char *infos = strtok_r(svptr, "\n", &svptr);
+    if (!infos) {
+        free(bcpy);
+        return NULL;
+    }
+    svptr = infos;
+    char *n = strtok_r(svptr, " ", &svptr);
+    if (fname && n) *fname = strdup(n);
+    char *csl = strtok_r(svptr, " ", &svptr);
+    if (!csl) {
+        free(bcpy);
+        return NULL;
+    }
+    *chunk_size = atoi(csl);
+    char *ofs = strtok_r(svptr, " ", &svptr);
+    if (!ofs) {
+        free(bcpy);
+        return NULL;
+    }
+    *offset = atoi(ofs);
+    char *ret = strtok_r(svptr, "\n", &svptr);
+    if (ret) ret = strdup(ret);
+    free(bcpy);
     return ret;
 }
+
 
 // print statistics gathered
 void print_statistics(ArrayList *statistics) {

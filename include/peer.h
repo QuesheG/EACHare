@@ -34,6 +34,10 @@ void create_peers(ArrayList *peers, ArrayList *peers_txt); // create peers
 int append_peer(ArrayList *peers, peer new_peer, int *i/*, char *file*/); // append new peer
 int peer_in_list(peer a, peer *neighbours, size_t peers_size); // check if peer is in list of known peers
 void append_list_peers(const char *buf, ArrayList *peers, size_t rec_peers_size/*, char *file*/); // append received list to known peer list
-void update_clock(peer *a, pthread_mutex_t *clock_lock, uint64_t n_clock); // update clock 
+void update_clock(peer *a, pthread_mutex_t *clock_lock, uint64_t n_clock); // update clock
+
+#ifdef WIN
+char* strtok_r(char *str, const char *delim, char **nextp);
+#endif
 
 #endif

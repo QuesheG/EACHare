@@ -78,6 +78,15 @@ bool is_list_empty(ArrayList list) {
     return (list.count == 0);
 }
 
+void remove_at(ArrayList *list, size_t pos) {
+    for(int i = pos + 1; i < list->count; i++) {
+        for(int j = 0; j < list->size_elements; j++) {
+            *((i-1) * list->size_elements + j + (byte*)list->elements) = *(i * list->size_elements + j + (byte*)list->elements);
+        }
+    }
+    list->count--;
+}
+
 //TODO: pop dequeue remove_at remove
 
 void free_list(ArrayList *list) {

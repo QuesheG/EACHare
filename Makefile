@@ -15,7 +15,7 @@ ifeq ($(OS), Windows_NT)
 LDFLAGS = -lws2_32 -lpthread
 REMOVE = rmdir /s /q
 else
-LDFLAGS = -lpthread -lm
+LDFLAGS = -lpthread -lm -fsanitize=thread
 REMOVE = rm -rf
 endif
 

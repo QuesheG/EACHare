@@ -100,6 +100,7 @@ void show_files(ArrayList *files) {
 }
 
 char *dir_file_path(const char *dir_path, const char *file_name) {
+    if(!dir_path || !file_name) return NULL;
     size_t d_path_size = strlen(dir_path);
     size_t ch_file_size = strlen(file_name);
     char *file_path = malloc(sizeof(char) * (ch_file_size + d_path_size + 2));

@@ -29,15 +29,9 @@ python testing.py
 This product includes software developed by the Apache Group for use in the Apache HTTP server project (http://www.apache.org/).
 
 ## TODO:
-- fix append list files same filename
-
-- fix att peer;
-
 - fix thread num (testar numero de threads e tempo com diferentes arquivos e peers)
 
 - fix tratamento de erros
-
-- fix listen_thread mem leak
 
 - fix "port exhaustion" error when sending messages
 
