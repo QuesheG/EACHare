@@ -167,7 +167,7 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers, cons
         free(file_path);
         return;
     }
-    if(!file_in_list((char **)files_list->elements, files->count, n_entry))
+    if (!file_in_list((char **)files_list->elements, files_list->count, n_entry))
         append_element(files_list, (void *)&n_entry);
     free(n_entry);
     for(int i = 0; i < files->count; i++) {
