@@ -21,6 +21,10 @@ void create_address(peer *address, const char *ip, uint64_t clock)
     char *ip_cpy = strdup(ip);
     char *tokip = strtok(ip_cpy, ":");
     char *tokport = strtok(NULL, ":");
+    if(!tokip || !tokport) {
+        free(ip_cpy);
+        return;
+    }
     address->con.sin_addr.s_addr = inet_addr(tokip);
     address->con.sin_family = AF_INET;
     address->con.sin_port = htons((unsigned short)(atoi(tokport))); // make string into int, then the int into short, then the short into a network byte order short
@@ -90,8 +94,7 @@ int peer_in_list(peer a, peer *neighbours, size_t peers_size)
 }
 
 // append received list to known peer list
-void append_list_peers(const char *buf, ArrayList *peers, size_t rec_peers_size /*, char *file*/)
-{
+void append_list_peers(const char *buf, ArrayList *peers, size_t rec_peers_size /*, char *file*/) {
     char *cpy = strdup(buf);
     strtok(cpy, " ");  // ip
     strtok(NULL, " "); // clock
@@ -99,8 +102,7 @@ void append_list_peers(const char *buf, ArrayList *peers, size_t rec_peers_size 
     strtok(NULL, " "); // size
     char *list = strtok(NULL, "\n");
 
-    if (!list)
-    {
+    if(!list) {
         fprintf(stderr, "Lista de peers vazia!\n");
         free(cpy);
         return;
@@ -109,32 +111,29 @@ void append_list_peers(const char *buf, ArrayList *peers, size_t rec_peers_size 
     char *p = NULL;
     peer *rec_peers_list = malloc(sizeof(peer) * rec_peers_size);
 
-    if (!rec_peers_list)
-    {
+    if(!rec_peers_list) {
         fprintf(stderr, "Erro: Falha na alocacao de rec_peers_list");
         free(cpy);
         return;
     }
     size_t info_count = 0;
-    for (int i = 0; i < rec_peers_size; i++, info_count++)
-    {
+    for(int i = 0; i < rec_peers_size; i++, info_count++) {
         char *cpy_l = strdup(list);
-        for (int j = 0; j <= info_count; j++)
-        {
+        for(int j = 0; j <= info_count; j++) {
             if (j == 0)
                 p = strtok(cpy_l, " ");
             else
                 p = strtok(NULL, " ");
         }
         char *infon = strtok(p, ":");
-        for (int j = 0; j < 4; j++)
-        { // hardcoding infos size :D => ip1:port2:status3:num4
-            if (j == 0)
+        if(!infon) break;
+        for(int j = 0; j < 4; j++) {// hardcoding infos size :D => ip1:port2:status3:num4
+            if(!infon) break;
+            if(j == 0)
                 rec_peers_list[i].con.sin_addr.s_addr = inet_addr(infon);
-            if (j == 1)
+            if(j == 1)
                 rec_peers_list[i].con.sin_port = htons((unsigned short)atoi(infon));
-            if (j == 2)
-            {
+            if(j == 2) {
                 if (strcmp(infon, "ONLINE") == 0)
                     rec_peers_list[i].status = ONLINE;
                 else
@@ -146,16 +145,13 @@ void append_list_peers(const char *buf, ArrayList *peers, size_t rec_peers_size 
         }
 
         bool add = true;
-        for (int j = 0; j < peers->count; j++)
-        {
-            if (is_same_peer(rec_peers_list[i], ((peer *)peers->elements)[j]))
-            {
+        for(int j = 0; j < peers->count; j++) {
+            if(is_same_peer(rec_peers_list[i], ((peer *)peers->elements)[j])) {
                 add = false;
                 break;
             }
         }
-        if (add)
-        {
+        if(add) {
             int j = 0;
             rec_peers_list[i].con.sin_family = AF_INET;
             int res = append_peer(peers, rec_peers_list[i], &j /*, file*/);

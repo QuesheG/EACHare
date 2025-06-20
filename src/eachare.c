@@ -28,8 +28,7 @@ void *treat_request(void *args)
 
     ssize_t valread = recv(n_sock, buf, MSG_SIZE - 1, 0);
 
-    if (valread <= 0)
-    {
+    if (valread <= 0) {
         perror("Erro: Falha lendo mensagem de vizinho\n");
         free(args);
         sock_close(n_sock);
@@ -38,7 +37,15 @@ void *treat_request(void *args)
     }
 
     peer sender;
-    MSG_TYPE msg_type = read_message(buf, &sender);
+    MSG_TYPE msg_type = read_message(buf_cpy, &sender);
+    if(msg_type == UNEXPECTED_MSG_TYPE) {
+        fprintf(stderr, "Erro: Falha com mensagem de vizinho\n");
+        free(buf);
+        sock_close(n_sock);
+        free(args);
+        pthread_exit(NULL);
+        return NULL;
+    }
     char *temp = check_msg_full(buf, n_sock, msg_type, NULL, &valread);
     if (temp)
     {
@@ -47,10 +54,15 @@ void *treat_request(void *args)
     }
 
     buf[valread] = '\0';
-
     printf("\n");
     printf("\tMensagem recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
     update_clock(server, &clock_lock, sender.p_clock);
+    char *buf_cpy = strdup(buf);
+    if(!buf_cpy) {
+        perror("Erro: Falha de duplicacao");
+        free(buf);
+        return NULL;
+    }
     int i = peer_in_list(sender, (peer *)peers->elements, peers->count);
     if (i < 0)
     {
@@ -74,7 +86,7 @@ void *treat_request(void *args)
         share_files_list(server, &clock_lock, n_sock, sender, dir_path);
         break;
     case DL:
-        send_file(server, &clock_lock, buf, n_sock, sender, dir_path);
+        send_file(server, &clock_lock, buf_cpy, n_sock, sender, dir_path);
         break;
     case BYE:
         if (sender.status == ONLINE)
