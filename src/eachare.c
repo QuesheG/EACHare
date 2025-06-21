@@ -96,8 +96,8 @@ void *treat_request(void *args)
     free(buf);
     sock_close(n_sock);
     free(args);
-    printf("\n");
     printf(">");
+    fflush(stdout);
     pthread_exit(NULL);
     return NULL;
 }

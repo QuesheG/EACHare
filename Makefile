@@ -9,13 +9,13 @@ OBJ_FILES = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_FILES))
 
 FINAL = eachare
 
-CFLAGS = -fsanitize=thread -g3 -O3 -Wall -I$(INC_DIR)
+CFLAGS = -O3 -Wall -I$(INC_DIR)
 
 ifeq ($(OS), Windows_NT)
 LDFLAGS = -lws2_32 -lpthread
 REMOVE = rmdir /s /q
 else
-LDFLAGS = -lpthread -lm -fsanitize=thread
+LDFLAGS = -lpthread -lm
 REMOVE = rm -rf
 endif
 

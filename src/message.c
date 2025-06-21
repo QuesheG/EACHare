@@ -290,7 +290,6 @@ void send_file(peer *server, pthread_mutex_t *clock_lock, char *buf, SOCKET con,
     base64_encode(encoded, file_cont, bytes_read);
     fargs->contentb64 = encoded;
     char *msg = build_message(server->con, server->p_clock, FILEMSG, (void *)fargs);
-    printf("\ns %d %.*s\n", fargs->offset, 10, encoded);
     if(msg) {
         printf("\tEncaminhando mensagem \"%.*s\" para %s:%d\n", (int)MIN(strcspn(msg, "\n"), MSG_SIZE), msg, inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port));
         send_complete(con, msg, strlen(msg) + 1, 0); //FIXME: HELP
@@ -682,7 +681,6 @@ void *download_file_thread(void *args) {
     ArrayList *holders_list = cpy_list(nfile.holders);
     char *fname = strdup(nfile.file.fname);
     while(offset * chunk < nfile.file.fsize) {
-        printf("\nThread #%d at offset %d\n", id, offset);
         peer *holders = holders_list->elements;
         size_t ppos = 0;
         if(holders_list->count > 0)
@@ -721,7 +719,6 @@ void *download_file_thread(void *args) {
             patience++;
             continue;
         }
-        printf("built msg at %d\n", offset);
         SOCKET req = send_message(msg, &(req_peer));
         if(is_invalid_sock(req)) {
             fprintf(stderr, "\nErro: Falha com socket\n");
@@ -824,7 +821,6 @@ void *download_file_thread(void *args) {
         patience = 0;
         offset = id + (round * threads_size);
     }
-    printf("Terminada thread #%d\n", id);
     free_list(holders_list);
     free(fname);
     fclose(file);
