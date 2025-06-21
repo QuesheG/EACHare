@@ -228,12 +228,14 @@ void share_files_list(peer *server, pthread_mutex_t *clock_lock, SOCKET con, pee
 // send file
 void send_file(peer *server, pthread_mutex_t *clock_lock, char *buf, SOCKET con, peer sender, char *dir_path) {
     if(!dir_path) {
+        fprintf(stderr, "Erro: nenhum diretorio encontrado\n");
         sock_close(con);
         free(buf);
         return;
     }
     file_msg_args *fargs = malloc(sizeof(file_msg_args));
     if(!fargs) {
+        perror("Erro: falha em alloc de argumento de arquivo\n");
         sock_close(con);
         free(buf);
         return;
@@ -243,12 +245,14 @@ void send_file(peer *server, pthread_mutex_t *clock_lock, char *buf, SOCKET con,
     if(a)
         free(a);
     if(!fargs->file_name) {
+        fprintf(stderr, "Erro: Impossivel encontrar arquivo requisitado\n");
         free(fargs);
         sock_close(con);
         return;
     }
     char *file_path = dir_file_path(dir_path, fargs->file_name);
     if(!file_path) {
+        fprintf(stderr, "Erro: Falha criando caminho de arquivo\n");
         sock_close(con);
         free(fargs);
         return;
@@ -256,6 +260,7 @@ void send_file(peer *server, pthread_mutex_t *clock_lock, char *buf, SOCKET con,
     FILE *file = fopen(file_path, "rb");
     if(!file) {
         fprintf(stderr, "Erro: Falha abrindo arquivo para compartilhar\n");
+        sock_close(con);
         free(file_path);
         free(fargs);
         return;
@@ -264,6 +269,7 @@ void send_file(peer *server, pthread_mutex_t *clock_lock, char *buf, SOCKET con,
     if(!file_cont) {
         fprintf(stderr, "Erro: Falha alocando conteudo do arquivo\n");
         fclose(file);
+        sock_close(con);
         free(file_path);
         free(fargs);
         return;
@@ -274,18 +280,22 @@ void send_file(peer *server, pthread_mutex_t *clock_lock, char *buf, SOCKET con,
     if(!encoded) {
         fprintf(stderr, "Erro: Falha alocando arquivo codificado\n");
         fclose(file);
+        sock_close(con);
         free(file_path);
         free(fargs);
         free(file_cont);
         return;
     }
+    //TODO: CHECK FSEEK, FREAD AND ENCODE
     base64_encode(encoded, file_cont, bytes_read);
     fargs->contentb64 = encoded;
     char *msg = build_message(server->con, server->p_clock, FILEMSG, (void *)fargs);
+    printf("\ns %d %.*s\n", fargs->offset, 10, encoded);
     if(msg) {
         printf("\tEncaminhando mensagem \"%.*s\" para %s:%d\n", (int)MIN(strcspn(msg, "\n"), MSG_SIZE), msg, inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port));
         send_complete(con, msg, strlen(msg) + 1, 0); //FIXME: HELP
     }
+    else fprintf(stderr, "Erro: Falha ao construir mensagem de envio de arquivo\n");
     sock_close(con);
     fclose(file);
     free(file_path);
@@ -385,12 +395,18 @@ SOCKET send_message(const char *msg, peer *neighbour) {
         fprintf(stderr, "\nErro: Mensagem de envio vazia!\n");
         return INVALID_SOCKET;
     }
+    if(!neighbour) {
+        fprintf(stderr, "\nErro: Nenhum peer\n");
+        return INVALID_SOCKET;
+    }
     SOCKET server_soc = socket(AF_INET, SOCK_STREAM, 0);
     if(is_invalid_sock(server_soc)) {
         fprintf(stderr, "\nErro: Falha na criacao do socket");
         show_soc_error();
         return INVALID_SOCKET;
     }
+    bool yes = true;
+    setsockopt(server_soc, SOL_SOCKET, SO_REUSEADDR, (char*)&yes, sizeof(yes));
     if(connect(server_soc, (const struct sockaddr *)&(neighbour->con), sizeof(neighbour->con)) != 0) {
         fprintf(stderr, "\nErro: Falha ao conectar ao peer\n");
         show_soc_error();
@@ -659,20 +675,30 @@ void *download_file_thread(void *args) {
     char *file_path = dir_file_path(a->dir_path, nfile.file.fname);
     int round = 0;
     uint64_t offset = id;
-    FILE *file = fopen(file_path, "wb");
+    FILE *file = fopen(file_path, "r+b");
     free(file_path);
-    peer *holders = (peer *)nfile.holders->elements;
     uint8_t patience = 0;
+    uint8_t resistance = 0;
+    ArrayList *holders_list = cpy_list(nfile.holders);
+    char *fname = strdup(nfile.file.fname);
     while(offset * chunk < nfile.file.fsize) {
+        printf("\nThread #%d at offset %d\n", id, offset);
+        peer *holders = holders_list->elements;
         size_t ppos = 0;
-        printf("\n\nholders_count: %d\nid: %d\nround: %d\noffset: %d\npatience: %d\n\n", nfile.holders->count, id, round, offset, patience);
-        if(nfile.holders->count > 0)
-            ppos = (id + (round * threads_size)) % nfile.holders->count;
-        if(patience > 10)
-            if(nfile.holders->count > 0)
-                remove_at(nfile.holders, ppos);
-        if(nfile.holders->count <= 0) {
+        if(holders_list->count > 0)
+            ppos = (id + (round * threads_size)) % holders_list->count;
+        if(patience > 5) {
+            resistance++;
+            mssleep(100);
+            if(resistance > 5)
+                if(holders_list->count > 0)
+                    remove_at(holders_list, ppos);
+            patience = 0;
+        }
+        if(holders_list->count <= 0) {
             fprintf(stderr, "\nErro: Falha ao baixar arquivo, # maximo de tentativas feitas\n");
+            free_list(holders_list);
+            free(fname);
             fclose(file);
             free(a);
             pthread_exit(NULL);
@@ -680,14 +706,22 @@ void *download_file_thread(void *args) {
         }
         peer req_peer = holders[ppos];
         dl_msg_args *dargs = malloc(sizeof(*dargs));
+        if(!dargs) {
+            perror("Erro: Falha alocando argumento de arquivo\n");
+            patience++;
+            continue;
+        }
         dargs->chunk_size = chunk;
-        dargs->fname = nfile.file.fname;
+        dargs->fname = fname;
         dargs->offset = offset;
         update_clock(server, lock, 0);
         char *msg = build_message(server->con, server->p_clock, DL, (void *)dargs);
         free(dargs);
-        if(!msg)
+        if(!msg) {
+            patience++;
             continue;
+        }
+        printf("built msg at %d\n", offset);
         SOCKET req = send_message(msg, &(req_peer));
         if(is_invalid_sock(req)) {
             fprintf(stderr, "\nErro: Falha com socket\n");
@@ -697,7 +731,6 @@ void *download_file_thread(void *args) {
             continue;
         }
         free(msg);
-        printf("msgsent\n");
         size_t temp_size = MSG_SIZE + 26 + base64encode_len(chunk) + 1;
         char *buf = calloc(temp_size, sizeof(char));
         if(!buf) {
@@ -706,9 +739,8 @@ void *download_file_thread(void *args) {
             continue;
         }
         ssize_t total_received = 0;
-        printf("message\n");
+        set_sock_timeout(req, 2);
         while(total_received < temp_size) {
-            printf("receiving\n");
             ssize_t valread = recv(req, buf + total_received, temp_size - total_received, 0);
             if(valread < 0) {
                 fprintf(stderr, "\nErro: Falha no recebimento\n");
@@ -735,17 +767,17 @@ void *download_file_thread(void *args) {
             sock_close(req);
             continue;
         }
-        buf[total_received] = 0;
-        printf("received\n");
-        sock_close(req);
-        printf("\n");
-        printf("\n\tResposta recebida:  \"%.*s\"\n", (int)MIN(strcspn(buf, "\n"), MSG_SIZE), buf);
-        if(strlen(buf) < 15) {
+        if(total_received == 0) {
+            fprintf(stderr, "Erro: Mensagem mal formatada\n");
             free(buf);
             sock_close(req);
             patience++;
             continue;
         }
+        buf[total_received] = 0;
+        sock_close(req);
+        printf("\n");
+        printf("\n\tResposta recebida:  \"%.*s\"\n", (int)MIN(strcspn(buf, "\n"), MSG_SIZE), buf);
 
         int rec_chunk, soffset;
         int clock = 0;
@@ -754,6 +786,7 @@ void *download_file_thread(void *args) {
         update_clock(server, lock, clock);
         if(!file_b64) {
             fprintf(stderr, "Erro: Falha no recebimento do arquivo\n");
+            patience++;
             continue;
         }
         if(soffset != offset || rec_chunk > chunk) {
@@ -769,16 +802,31 @@ void *download_file_thread(void *args) {
             continue;
         }
         int decode_size = base64_decode(file_decoded, file_b64);
-        fseek(file, offset * chunk, SEEK_SET);
-        fwrite(file_decoded, 1, decode_size, file);
+        if(fseek(file, offset * chunk, SEEK_SET) != 0) {
+            perror("Erro: Falha na deslocacao do arquivo\n");
+            free(file_decoded);
+            free(file_b64);
+            patience++;
+            continue;
+        }
+        size_t w = fwrite(file_decoded, 1, decode_size, file);
+        if(w != decode_size) {
+            fprintf(stderr, "Erro: Falha com escrita em arquivo: esperava %d, escreveu %d\n", decode_size, (int)w);
+            free(file_b64);
+            free(file_decoded);
+            patience++;
+            continue;
+        }
         free(file_b64);
         free(file_decoded);
         round++;
-        printf("%d\n", round);
+        resistance = 0;
         patience = 0;
         offset = id + (round * threads_size);
     }
-    printf("Thread #%d concluiu\n", id);
+    printf("Terminada thread #%d\n", id);
+    free_list(holders_list);
+    free(fname);
     fclose(file);
     free(a);
     pthread_exit(NULL);
@@ -814,7 +862,7 @@ double get_std_deviation(double *list, size_t list_size, double avrg) {
 }
 
 void download_file(peer *server, pthread_mutex_t *clock_lock, ls_files chosen_file, const char *dir_path, size_t size_chunk, ArrayList *statistics) {
-    char size_thread_pool = 8;
+    uint8_t size_thread_pool = 4;
     pthread_t *thread_pool = malloc(sizeof(pthread_t) * size_thread_pool);
     clock_t init = clock();
     for(int i = 0; i < size_thread_pool; i++) {
@@ -829,8 +877,10 @@ void download_file(peer *server, pthread_mutex_t *clock_lock, ls_files chosen_fi
         a->statistics = statistics;
         pthread_create(&(thread_pool[i]), NULL, download_file_thread, (void *)a);
     }
-    for(int i = 0; i < size_thread_pool; i++)
+    for(int i = 0; i < size_thread_pool; i++) {
+        //printf("Waiting for thread #%d\n", i);
         pthread_join(thread_pool[i], NULL);
+    }
 
     free(thread_pool);
     double time_taken = ((double)(clock() - init)) / CLOCKS_PER_SEC;

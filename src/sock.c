@@ -56,6 +56,18 @@ bool set_sock_block(SOCKET sock, bool blocking)
 #endif
 }
 
+void set_sock_timeout(SOCKET sock, uint8_t touts) {
+    #ifdef WIN
+    DWORD timeout = touts * 1000;
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof timeout);
+    #else
+    struct timeval tv;
+    tv.tv_sec = touts;
+    tv.tv_usec = 0;
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
+    #endif
+}
+
 // send full message
 int send_complete(SOCKET sock, const void *buf, size_t len, int flag) {
     size_t sent = 0;

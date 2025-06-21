@@ -87,6 +87,15 @@ void remove_at(ArrayList *list, size_t pos) {
     list->count--;
 }
 
+ArrayList *cpy_list(ArrayList *list) {
+    if(!list) return NULL;
+    ArrayList *cpy = alloc_list(list->size_elements);
+    for(int i = 0; i < list->count; i++) {
+        append_element(cpy, (void*)(list->elements + (i * list->size_elements)));
+    }
+    return cpy;
+}
+
 //TODO: pop dequeue remove_at remove
 
 void free_list(ArrayList *list) {

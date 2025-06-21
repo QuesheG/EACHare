@@ -30,6 +30,7 @@ int init_win_sock(void);
 void sock_close(SOCKET sock); // standard function for socket creation
 void show_soc_error(); // standard function for socket error messages
 bool set_sock_block(SOCKET sock, bool blocking);
-int send_complete(SOCKET sock, const void *buf, size_t len, int flag); 
+void set_sock_timeout(SOCKET sock, uint8_t touts);
+int send_complete(SOCKET sock, const void *buf, size_t len, int flag);
 
 #endif

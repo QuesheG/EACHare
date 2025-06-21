@@ -57,7 +57,7 @@ void *treat_request(void *args)
     printf("\n");
     printf("\tMensagem recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
     update_clock(server, &clock_lock, sender.p_clock);
-    
+
     int i = peer_in_list(sender, (peer *)peers->elements, peers->count);
     if (i < 0)
     {
@@ -96,6 +96,7 @@ void *treat_request(void *args)
     free(buf);
     sock_close(n_sock);
     free(args);
+    printf("\n");
     printf(">");
     pthread_exit(NULL);
     return NULL;
