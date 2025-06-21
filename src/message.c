@@ -157,7 +157,6 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers, cons
     fclose(new_file);
 
     download_file(server, clock_lock, chosen_file, dir_path, size_chunk, statistics);
-
     char *n_entry = strdup(chosen_file.file.fname);
     if(!n_entry) {
         fprintf(stderr, "Erro: Falha ao acrescentar novo arquivo à lista\n");
@@ -167,9 +166,9 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers, cons
         free(file_path);
         return;
     }
-    if (!file_in_list((char **)files_list->elements, files_list->count, n_entry))
+    if(!file_in_list((char **)files_list->elements, files_list->count, n_entry))
         append_element(files_list, (void *)&n_entry);
-    free(n_entry);
+    else free(n_entry);
     for(int i = 0; i < files->count; i++) {
         free(((ls_files *)files->elements)[i].file.fname);
         free_list(((ls_files *)files->elements)[i].holders);
@@ -243,7 +242,6 @@ void send_file(peer *server, pthread_mutex_t *clock_lock, char *buf, SOCKET con,
     char *a = get_file_in_msg(buf, &clock, &(fargs->file_name), &(fargs->chunk_size), &(fargs->offset));
     if(a)
         free(a);
-    free(buf);
     if(!fargs->file_name) {
         free(fargs);
         sock_close(con);
@@ -424,18 +422,19 @@ MSG_TYPE read_message(const char *buf, peer *sender) {
         return UNEXPECTED_MSG_TYPE;
     strncpy(buf_cpy, buf, MSG_SIZE);
     char *svptr = buf_cpy;
-    char *tok_ip = strtok_r(svptr, " ", &svptr);
+    char *tok_ip = strtok_r(buf_cpy, " ", &svptr);
     if(!tok_ip) {
+        printf("\n\n%s, %s\n\n\n", buf, buf_cpy);
         free(buf_cpy);
         return UNEXPECTED_MSG_TYPE;
     }
-    char *cls = strtok_r(svptr, " ", &svptr);
+    char *cls = strtok_r(NULL, " ", &svptr);
     if(!cls) {
         free(buf_cpy);
         return UNEXPECTED_MSG_TYPE;
     }
     int aclock = atoi(cls);
-    char *tok_msg = strtok_r(svptr, " ", &svptr);
+    char *tok_msg = strtok_r(NULL, " ", &svptr);
 
     if(tok_msg) {
         tok_msg[strcspn(tok_msg, "\n")] = '\0';
@@ -666,14 +665,14 @@ void *download_file_thread(void *args) {
     uint8_t patience = 0;
     while(offset * chunk < nfile.file.fsize) {
         size_t ppos = 0;
+        printf("\n\nholders_count: %d\nid: %d\nround: %d\noffset: %d\npatience: %d\n\n", nfile.holders->count, id, round, offset, patience);
         if(nfile.holders->count > 0)
             ppos = (id + (round * threads_size)) % nfile.holders->count;
-        else
-            return NULL;
-        if(patience == 6)
+        if(patience > 10)
             if(nfile.holders->count > 0)
                 remove_at(nfile.holders, ppos);
-        if(nfile.holders->count == 0) {
+        if(nfile.holders->count <= 0) {
+            fprintf(stderr, "\nErro: Falha ao baixar arquivo, # maximo de tentativas feitas\n");
             fclose(file);
             free(a);
             pthread_exit(NULL);
@@ -698,6 +697,7 @@ void *download_file_thread(void *args) {
             continue;
         }
         free(msg);
+        printf("msgsent\n");
         size_t temp_size = MSG_SIZE + 26 + base64encode_len(chunk) + 1;
         char *buf = calloc(temp_size, sizeof(char));
         if(!buf) {
@@ -706,7 +706,9 @@ void *download_file_thread(void *args) {
             continue;
         }
         ssize_t total_received = 0;
+        printf("message\n");
         while(total_received < temp_size) {
+            printf("receiving\n");
             ssize_t valread = recv(req, buf + total_received, temp_size - total_received, 0);
             if(valread < 0) {
                 fprintf(stderr, "\nErro: Falha no recebimento\n");
@@ -734,6 +736,7 @@ void *download_file_thread(void *args) {
             continue;
         }
         buf[total_received] = 0;
+        printf("received\n");
         sock_close(req);
         printf("\n");
         printf("\n\tResposta recebida:  \"%.*s\"\n", (int)MIN(strcspn(buf, "\n"), MSG_SIZE), buf);
@@ -771,9 +774,11 @@ void *download_file_thread(void *args) {
         free(file_b64);
         free(file_decoded);
         round++;
+        printf("%d\n", round);
         patience = 0;
         offset = id + (round * threads_size);
     }
+    printf("Thread #%d concluiu\n", id);
     fclose(file);
     free(a);
     pthread_exit(NULL);
@@ -809,7 +814,7 @@ double get_std_deviation(double *list, size_t list_size, double avrg) {
 }
 
 void download_file(peer *server, pthread_mutex_t *clock_lock, ls_files chosen_file, const char *dir_path, size_t size_chunk, ArrayList *statistics) {
-    char size_thread_pool = 4;
+    char size_thread_pool = 8;
     pthread_t *thread_pool = malloc(sizeof(pthread_t) * size_thread_pool);
     clock_t init = clock();
     for(int i = 0; i < size_thread_pool; i++) {
@@ -828,7 +833,6 @@ void download_file(peer *server, pthread_mutex_t *clock_lock, ls_files chosen_fi
         pthread_join(thread_pool[i], NULL);
 
     free(thread_pool);
-
     double time_taken = ((double)(clock() - init)) / CLOCKS_PER_SEC;
     stat_block n = {
         .chunk_used = size_chunk,
@@ -858,11 +862,11 @@ void download_file(peer *server, pthread_mutex_t *clock_lock, ls_files chosen_fi
 void append_files_list(const char *buf, ArrayList *list, peer sender, size_t rec_files_len) {
     char *cpy = strdup(buf);
     char *svptr = cpy;
-    strtok_r(svptr, " ", &svptr);  // ip
-    strtok_r(svptr, " ", &svptr); // clock
-    strtok_r(svptr, " ", &svptr); // type
-    strtok_r(svptr, " ", &svptr); // size
-    char *list_rec = strtok_r(svptr, "\n", &svptr);
+    strtok_r(svptr, " ", &svptr); // ip
+    strtok_r(NULL, " ", &svptr); // clock
+    strtok_r(NULL, " ", &svptr); // type
+    strtok_r(NULL, " ", &svptr); // size
+    char *list_rec = strtok_r(NULL, "\n", &svptr);
 
     if(!list_rec) {
         fprintf(stderr, "Erro: Lista de arquivos nao encontrada!\n");
@@ -881,10 +885,13 @@ void append_files_list(const char *buf, ArrayList *list, peer sender, size_t rec
         char *cpy_l = strdup(list_rec);
         char *svptr = cpy_l;
         for(int j = 0; j <= i; j++)
-            p = strtok_r(svptr, " ", &svptr);
+            if(j == 0)
+                p = strtok_r(svptr, " ", &svptr);
+            else
+                p = strtok_r(NULL, " ", &svptr);
         svptr = p;
         char *infoname = strtok_r(svptr, ":", &svptr);
-        char *infosize = strtok_r(svptr, "\0", &svptr);
+        char *infosize = strtok_r(NULL, "\0", &svptr);
         int position;
 
         if(first_iteration) {
@@ -896,6 +903,7 @@ void append_files_list(const char *buf, ArrayList *list, peer sender, size_t rec
                 .peers_size = 1,
             };
             append_element(list, (void *)&a);
+            first_iteration = false;
         }
         else {
             char *fname = strdup(infoname);
@@ -934,14 +942,14 @@ char *get_file_in_msg(char *buf, int *clock, char **fname, int *chunk_size, int*
     char *bcpy = strdup(buf);
     char *svptr = bcpy;
     strtok_r(svptr, " ", &svptr);           // ip
-    char *cls = strtok_r(svptr, " ", &svptr);
+    char *cls = strtok_r(NULL, " ", &svptr);
     if (!cls) {
         free(bcpy);
         return NULL;
     }
     *clock = atoi(cls);
-    strtok_r(svptr, " ", &svptr);           // type
-    char *infos = strtok_r(svptr, "\n", &svptr);
+    strtok_r(NULL, " ", &svptr);           // type
+    char *infos = strtok_r(NULL, "\n", &svptr);
     if (!infos) {
         free(bcpy);
         return NULL;
@@ -949,19 +957,19 @@ char *get_file_in_msg(char *buf, int *clock, char **fname, int *chunk_size, int*
     svptr = infos;
     char *n = strtok_r(svptr, " ", &svptr);
     if (fname && n) *fname = strdup(n);
-    char *csl = strtok_r(svptr, " ", &svptr);
+    char *csl = strtok_r(NULL, " ", &svptr);
     if (!csl) {
         free(bcpy);
         return NULL;
     }
     *chunk_size = atoi(csl);
-    char *ofs = strtok_r(svptr, " ", &svptr);
+    char *ofs = strtok_r(NULL, " ", &svptr);
     if (!ofs) {
         free(bcpy);
         return NULL;
     }
     *offset = atoi(ofs);
-    char *ret = strtok_r(svptr, "\n", &svptr);
+    char *ret = strtok_r(NULL, "\n", &svptr);
     if (ret) ret = strdup(ret);
     free(bcpy);
     return ret;

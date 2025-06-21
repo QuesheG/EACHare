@@ -28,7 +28,7 @@ void *treat_request(void *args)
 
     ssize_t valread = recv(n_sock, buf, MSG_SIZE - 1, 0);
 
-    if (valread <= 0) {
+    if(valread <= 0) {
         perror("Erro: Falha lendo mensagem de vizinho\n");
         free(args);
         sock_close(n_sock);

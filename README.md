@@ -32,7 +32,3 @@ This product includes software developed by the Apache Group for use in the Apac
 - fix thread num (testar numero de threads e tempo com diferentes arquivos e peers)
 
 - fix tratamento de erros
-
-- fix "port exhaustion" error when sending messages
-
-- fix "not enough space" error when sending messages

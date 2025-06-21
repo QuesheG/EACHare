@@ -19,9 +19,9 @@ bool is_same_peer(peer a, peer b)
 void create_address(peer *address, const char *ip, uint64_t clock)
 {
     char *ip_cpy = strdup(ip);
-    char *svptr;
-    char *tokip = strtok_r(ip_cpy, ":", &svptr);
-    char *tokport = strtok_r(svptr, ":", &svptr);
+    char *svptr = ip_cpy;
+    char *tokip = strtok_r(svptr, ":", &svptr);
+    char *tokport = strtok_r(NULL, ":", &svptr);
     if(!tokip || !tokport) {
         free(ip_cpy);
         return;
@@ -99,10 +99,10 @@ void append_list_peers(const char *buf, ArrayList *peers, size_t rec_peers_size 
     char *cpy = strdup(buf);
     char *svptr = cpy;
     strtok_r(svptr, " ", &svptr);  // ip
-    strtok_r(svptr, " ", &svptr); // clock
-    strtok_r(svptr, " ", &svptr); // type
-    strtok_r(svptr, " ", &svptr); // size
-    char *list = strtok_r(svptr, "\n", &svptr);
+    strtok_r(NULL, " ", &svptr); // clock
+    strtok_r(NULL, " ", &svptr); // type
+    strtok_r(NULL, " ", &svptr); // size
+    char *list = strtok_r(NULL, "\n", &svptr);
 
     if(!list) {
         fprintf(stderr, "Lista de peers vazia!\n");
@@ -123,7 +123,10 @@ void append_list_peers(const char *buf, ArrayList *peers, size_t rec_peers_size 
         char *cpy_l = strdup(list);
         svptr = cpy_l;
         for(int j = 0; j <= info_count; j++)
-            p = strtok_r(svptr, " ", &svptr);
+            if(j == 0)
+                p = strtok_r(svptr, " ", &svptr);
+            else
+                p = strtok_r(NULL, " ", &svptr);
         svptr = p;
         char *infon = strtok_r(svptr, ":", &svptr);
         if(!infon) break;
@@ -141,7 +144,7 @@ void append_list_peers(const char *buf, ArrayList *peers, size_t rec_peers_size 
             }
             if (j == 3)
                 rec_peers_list[i].p_clock = atoi(infon);
-            infon = strtok_r(svptr, ":", &svptr);
+            infon = strtok_r(NULL, ":", &svptr);
         }
 
         bool add = true;
