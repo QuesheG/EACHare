@@ -21,6 +21,7 @@
 #define INVALID_SOCKET -1
 #endif
 
+#include <stdint.h>
 #include <stdbool.h>
 
 #ifdef WIN

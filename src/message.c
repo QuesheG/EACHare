@@ -405,7 +405,11 @@ SOCKET send_message(const char *msg, peer *neighbour) {
         return INVALID_SOCKET;
     }
     bool yes = true;
-    setsockopt(server_soc, SOL_SOCKET, SO_REUSEADDR, (char*)&yes, sizeof(yes));
+    if(setsockopt(server_soc, SOL_SOCKET, SO_REUSEADDR, (char*)&yes, sizeof(yes))!=0) {
+        fprintf(stderr, "\nErro: Falha definindo opcao de socket\n");
+        show_soc_error();
+        sock_close(server_soc);
+    }
     if(connect(server_soc, (const struct sockaddr *)&(neighbour->con), sizeof(neighbour->con)) != 0) {
         fprintf(stderr, "\nErro: Falha ao conectar ao peer\n");
         show_soc_error();
@@ -684,7 +688,7 @@ void *download_file_thread(void *args) {
         peer *holders = holders_list->elements;
         size_t ppos = 0;
         if(holders_list->count > 0)
-            ppos = (id + (round * threads_size)) % holders_list->count;
+            ppos = (id + round) % holders_list->count;
         if(patience > 5) {
             resistance++;
             mssleep(100);
@@ -721,8 +725,8 @@ void *download_file_thread(void *args) {
         }
         SOCKET req = send_message(msg, &(req_peer));
         if(is_invalid_sock(req)) {
-            fprintf(stderr, "\nErro: Falha com socket\n");
-            show_soc_error();
+            // fprintf(stderr, "\nErro: Falha com socket\n");
+            // show_soc_error();
             free(msg);
             patience++;
             continue;

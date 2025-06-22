@@ -122,7 +122,7 @@ void *listen_socket(void *args)
         show_soc_error();
         return NULL;
     }
-    set_sock_block(server_soc, true);
+    set_sock_block(server_soc, false);
     if (listen(server_soc, 3) != 0) {
         fprintf(stderr, "\nErro: Falha colocando socket para escutar\n");
         show_soc_error();
@@ -178,6 +178,11 @@ int main(int argc, char **argv)
         fprintf(stderr, "Erro: falha na alocação de memoria\n");
         return 1;
     }
+
+    //TODO: tratar argv[1~3]
+    //argv[1] => checar se é <ip>:<porta>
+    //argv[2] => tirar links a diretorios pais, checar se todas linhas sao <ip>:<porta>
+    //argv[3] => tirar links a pais 
 
     create_address(server, argv[1], 0);
 
