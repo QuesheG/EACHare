@@ -417,17 +417,20 @@ SOCKET send_message(const char *msg, peer *neighbour) {
         show_soc_error();
         return INVALID_SOCKET;
     }
+    #ifdef WIN
     bool yes = true;
     if(setsockopt(server_soc, SOL_SOCKET, SO_REUSEADDR, (char*)&yes, sizeof(yes))!=0) {
         fprintf(stderr, "\nErro: Falha definindo opcao de socket\n");
         show_soc_error();
         sock_close(server_soc);
     }
-    if(setsockopt(server_soc, SOL_SOCKET, SO_LINGER, (char*)&yes, sizeof(yes))!=0) {
+    yes = !yes;
+    if(setsockopt(server_soc, SOL_SOCKET, SO_DONTLINGER, (char*)&yes, sizeof(yes))!=0) {
         fprintf(stderr, "\nErro: Falha definindo opcao de socket\n");
         show_soc_error();
         sock_close(server_soc);
     }
+    #endif
     if(connect(server_soc, (const struct sockaddr *)&(neighbour->con), sizeof(neighbour->con)) != 0) {
         fprintf(stderr, "\nErro: Falha ao conectar ao peer\n");
         show_soc_error();
