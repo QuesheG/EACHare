@@ -259,10 +259,18 @@ void send_file(peer *server, pthread_mutex_t *clock_lock, char *buf, SOCKET con,
         return;
     }
     FILE *file = fopen(file_path, "rb");
+    free(file_path);
     if(!file) {
         fprintf(stderr, "Erro: Falha abrindo arquivo para compartilhar\n");
         sock_close(con);
-        free(file_path);
+        free(fargs);
+        return;
+    }
+    if(fseek(file, fargs->chunk_size * fargs->offset, SEEK_SET) < 0) {
+        perror("Erro: Falha na deslocacao do arquivo");
+        fclose(file);
+        sock_close(con);
+        free(fargs->file_name);
         free(fargs);
         return;
     }
@@ -271,39 +279,43 @@ void send_file(peer *server, pthread_mutex_t *clock_lock, char *buf, SOCKET con,
         fprintf(stderr, "Erro: Falha alocando conteudo do arquivo\n");
         fclose(file);
         sock_close(con);
-        free(file_path);
         free(fargs);
         return;
     }
-    fseek(file, fargs->chunk_size * fargs->offset, SEEK_SET);
     size_t bytes_read = fread(file_cont, 1, fargs->chunk_size, file);
-    char *encoded = malloc(sizeof(char) * base64encode_len(bytes_read));
+    fclose(file);
+    size_t bytes_encode = base64encode_len(bytes_read);
+    char *encoded = malloc(sizeof(char) * bytes_encode);
     if(!encoded) {
         fprintf(stderr, "Erro: Falha alocando arquivo codificado\n");
-        fclose(file);
         sock_close(con);
-        free(file_path);
+        free(fargs->file_name);
         free(fargs);
         free(file_cont);
         return;
     }
-    //TODO: CHECK FSEEK, FREAD AND ENCODE
-    base64_encode(encoded, file_cont, bytes_read);
+    if(base64_encode(encoded, file_cont, bytes_read) != bytes_encode) {
+        fprintf(stderr, "Erro: Falha codificando mensagem\n");
+        sock_close(con);
+        free(encoded);
+        free(fargs->file_name);
+        free(fargs);
+        free(file_cont);
+        return;
+    }
     fargs->contentb64 = encoded;
     char *msg = build_message(server->con, server->p_clock, FILEMSG, (void *)fargs);
     if(msg) {
         printf("\tEncaminhando mensagem \"%.*s\" para %s:%d\n", (int)MIN(strcspn(msg, "\n"), MSG_SIZE), msg, inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port));
-        send_complete(con, msg, strlen(msg) + 1, 0); //FIXME: HELP
+        send_complete(con, msg, strlen(msg) + 1, 0);
+        free(msg);
     }
     else fprintf(stderr, "Erro: Falha ao construir mensagem de envio de arquivo\n");
     sock_close(con);
-    fclose(file);
-    free(file_path);
-    free(fargs->file_name);
     free(encoded);
+    free(fargs->file_name);
     free(fargs);
     free(file_cont);
-    free(msg);
 }
 
 // create a message with the sender ip, its clock and the message type
@@ -407,6 +419,12 @@ SOCKET send_message(const char *msg, peer *neighbour) {
     }
     bool yes = true;
     if(setsockopt(server_soc, SOL_SOCKET, SO_REUSEADDR, (char*)&yes, sizeof(yes))!=0) {
+        fprintf(stderr, "\nErro: Falha definindo opcao de socket\n");
+        show_soc_error();
+        sock_close(server_soc);
+    }
+    yes = !yes;
+    if(setsockopt(server_soc, SOL_SOCKET, SO_DONTLINGER, (char*)&yes, sizeof(yes))!=0) {
         fprintf(stderr, "\nErro: Falha definindo opcao de socket\n");
         show_soc_error();
         sock_close(server_soc);
@@ -629,8 +647,11 @@ ArrayList *receive_files(peer *server, pthread_mutex_t *clock_lock, ArrayList *p
 }
 
 void print_files_received(ArrayList *files) {
-    if(!files || files->size_elements != sizeof(ls_files))
-        return; // FIXME: treat
+    if(!files)
+        return;
+    if(files->size_elements != sizeof(ls_files)) {
+        fprintf(stderr, "Erro: Tipo de lista inesperado\n");
+    }
     uint16_t max_fname_size = 10;
     uint16_t max_fsize_size = 7;
     for(int i = 0; i < files->count; i++) {
@@ -1033,8 +1054,12 @@ char *get_file_in_msg(char *buf, int *clock, char **fname, int *chunk_size, int*
 
 // print statistics gathered
 void print_statistics(ArrayList *statistics) {
-    if(!statistics || statistics->size_elements != sizeof(stat_block))
-        return; // FIXME: treat
+    if(!statistics)
+        return;
+    if(statistics->size_elements != sizeof(stat_block)) {
+        fprintf(stderr, "Erro: Tipo de lista inesperado\n");
+        return;
+    }
     if(statistics->count == 0) {
         printf("Nenhuma estatistica obtida ainda\n");
         return;
