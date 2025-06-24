@@ -44,8 +44,9 @@ void show_peers(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers) {
             fprintf(stderr, "Erro: Falha na construcao da mensagem!\n");
             return;
         }
-        SOCKET s = send_message(msg, &(((peer *)peers->elements)[input - 1]));
-        sock_close(s);
+        peer *chosen = &(((peer*)peers->elements)[input-1]);
+        SOCKET s = send_message(msg, chosen);
+        if(!is_invalid_sock(s)) sock_close(s);
         free(msg);
     }
     else {
@@ -410,6 +411,10 @@ SOCKET send_message(const char *msg, peer *neighbour) {
         fprintf(stderr, "\nErro: Falha ao conectar ao peer\n");
         show_soc_error();
         sock_close(server_soc);
+        if(neighbour->status == ONLINE) {
+            neighbour->status = OFFLINE;
+            printf("\tAtualizando peer %s:%d status %s\n", inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port), status_string[0]);
+        }
         return INVALID_SOCKET;
     }
     size_t len = strlen(msg);
