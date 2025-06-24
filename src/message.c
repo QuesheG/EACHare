@@ -423,8 +423,7 @@ SOCKET send_message(const char *msg, peer *neighbour) {
         show_soc_error();
         sock_close(server_soc);
     }
-    yes = !yes;
-    if(setsockopt(server_soc, SOL_SOCKET, SO_DONTLINGER, (char*)&yes, sizeof(yes))!=0) {
+    if(setsockopt(server_soc, SOL_SOCKET, SO_LINGER, (char*)&yes, sizeof(yes))!=0) {
         fprintf(stderr, "\nErro: Falha definindo opcao de socket\n");
         show_soc_error();
         sock_close(server_soc);
