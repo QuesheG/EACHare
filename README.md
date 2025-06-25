@@ -1,34 +1,30 @@
 # EACHare
 
-EACHare is a file transfer project for USP's Distributed Systems course, it will feature
-EACHare é um projeto de transferência de arquivos entre peers para a matéria de Sistemas Distribuídos, implementando:
+EACHare is a file transfer project for USP's Distributed Systems course, it features:
 
-- Conexão peer to peer baseada em uma lista conhecida em tempo de execução
+- Peer to peer connection
 
-- Transferência de arquivo entre peers
+- Chunk-based file transfer
 
-## Instalação
+## Instal
 
-run
+Make sure to have a C compiler and a Make tool, clone the repository and run
+
 ```console
 make
 ```
 
-## Usar
+## Using
 
-Em seu terminal, monte seu endereço, escolha uma porta, um arquivo de texto com seus peers (um <ip>:<porta> por linha) e um diretório para compartilhar
-```console
-./eachare <ip>:<porta> <vizinhos.txt> <diretorio_compartilhado>
-```
+In the terminal, set up your address, choose a port and a text file with known peers (one <ip>:<port> pair per line) and a directory to share
 
-Também é possível usar o python para produzir um campo de testes com múltiplas pastas, cada qual com sua própria lista de peers e diretório para arquivos:
 ```console
-python testing.py
+./eachare <ip>:<port> <neighbours.txt> <shared_directory>
 ```
 
 This product includes software developed by the Apache Group for use in the Apache HTTP server project (http://www.apache.org/).
 
 ## TODO:
-- fix thread num (testar numero de threads e tempo com diferentes arquivos e peers)
+- fix thread num (test threads nums and time taken with different files and peers)
 
-- fix tratamento de erros
+- fix error treatment
