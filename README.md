@@ -6,17 +6,17 @@ EACHare is a file transfer project for USP's Distributed Systems course, it feat
 
 - Chunk-based file transfer
 
-## Instal
+## Install
 
-Make sure to have a C compiler and a Make tool, clone the repository and run
+Make sure to have a C compiler and a Make tool, clone the repository and run:
 
 ```console
 make
 ```
 
-## Using
+## Usage
 
-In the terminal, set up your address, choose a port and a text file with known peers (one <ip>:<port> pair per line) and a directory to share
+In the terminal, set up your address, choose a port and a text file with known peers (one ip:port pair per line) and a directory to share
 
 ```console
 ./eachare <ip>:<port> <neighbours.txt> <shared_directory>
