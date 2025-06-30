@@ -15,8 +15,8 @@ char *message_string[] = { "UNEXPECTED_MSG_TYPE", "HELLO", "GET_PEERS", "PEER_LI
 
 // print the peers in list
 void show_peers(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers) {
-    printf("Lista de peers:\n");
-    printf("\t[0] voltar para o menu anterior\n");
+    printf("Peer list:\n");
+    printf("\t[0] back\n");
 
     for(int i = 0; i < peers->count; i++) {
         printf("\t[%d] %s:%u ", i + 1, inet_ntoa(((peer *)peers->elements)[i].con.sin_addr), ntohs(((peer *)peers->elements)[i].con.sin_port));
@@ -32,7 +32,7 @@ void show_peers(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers) {
     if(scanf("%d", &input) != 1) {
         while(getchar() != '\n')
             ;
-        fprintf(stderr, "Erro: Entrada invalida! Tente de novo.\n");
+        fprintf(stderr, "Error: Invalid input! Try again.\n");
         return;
     }
     else if(input == 0)
@@ -41,7 +41,7 @@ void show_peers(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers) {
         update_clock(server, clock_lock, 0);
         char *msg = build_message(server->con, server->p_clock, HELLO, NULL);
         if(!msg) {
-            fprintf(stderr, "Erro: Falha na construcao da mensagem!\n");
+            fprintf(stderr, "Error: Failed building message\n");
             return;
         }
         peer *chosen = &(((peer*)peers->elements)[input-1]);
@@ -50,7 +50,7 @@ void show_peers(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers) {
         free(msg);
     }
     else {
-        fprintf(stderr, "Erro: Entrada invalida! Tente de novo.\n");
+        fprintf(stderr, "Error: Unexpected input! Try again.\n");
         return;
     }
 }
@@ -62,7 +62,7 @@ void get_peers(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers /*, c
         update_clock(server, clock_lock, 0);
         char *msg = build_message(server->con, server->p_clock, GET_PEERS, NULL);
         if(!msg) {
-            perror("Erro: Falha na construcao da mensagem!\n");
+            perror("Error: Failed building message\n");
             return;
         }
         SOCKET req = send_message(msg, &(((peer *)peers->elements)[i]));
@@ -73,7 +73,7 @@ void get_peers(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers /*, c
         char *buf = calloc(MSG_SIZE, sizeof(char));
         ssize_t valread = recv(req, buf, MSG_SIZE - 1, 0);
         if(valread <= 0) {
-            fprintf(stderr, "\nErro: Falha lendo mensagem\n");
+            fprintf(stderr, "\nError: Failed reading message\n");
             free(buf);
             free(msg);
             continue;
@@ -90,7 +90,7 @@ void get_peers(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers /*, c
         buf[valread] = '\0';
 
         printf("\n");
-        printf("\tResposta recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
+        printf("\tAnswer received: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
         update_clock(server, clock_lock, sender.p_clock);
         append_list_peers(buf, peers, rec_peers_size /*, file*/);
         sock_close(req);
@@ -108,7 +108,7 @@ void share_peers_list(peer *server, pthread_mutex_t *clock_lock, SOCKET soc, pee
     update_clock(server, clock_lock, 0);
     char *msg = build_message(server->con, server->p_clock, PEER_LIST, (void *)&args);
     if(!msg) return;
-    printf("\tEncaminhando mensagem \"%.*s\" para %s:%d\n", (int)strcspn(msg, "\n"), msg, inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port));
+    printf("\tSending message \"%.*s\" to %s:%d\n", (int)strcspn(msg, "\n"), msg, inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port));
     send_complete(soc, msg, strlen(msg) + 1, 0);
     sock_close(soc);
     free(msg);
@@ -125,17 +125,17 @@ bool file_in_list(char **files, size_t len, char *nf) {
 void get_files(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers, const char *dir_path, ArrayList *files_list, int size_chunk, ArrayList *statistics) {
     ArrayList *files = receive_files(server, clock_lock, peers);
     if(!files || files->count == 0) {
-        printf("Nenhum arquivo encontrado!\n");
+        printf("No files found\n");
         return;
     }
     print_files_received(files);
-    printf("Digite o numero do arquivo para fazer o download:\n");
+    printf("Input file number to download it:\n");
     int f_to_down = 0;
     printf(">");
     if(scanf("%d", &f_to_down) != 1) {
         while(getchar() != '\n')
             ;
-        printf("Comando inesperado\n");
+        printf("Unexpected command\n");
         f_to_down = 0;
     }
     if(!f_to_down)
@@ -148,7 +148,7 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers, cons
     char *file_path = dir_file_path(dir_path, chosen_file.file.fname);
     FILE *new_file = fopen(file_path, "wb");
     if(!new_file) {
-        perror("Erro: Falha abrindo arquivo");
+        perror("Error: Failed opening file");
         free(file_path);
         free(files);
         return;
@@ -160,7 +160,7 @@ void get_files(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers, cons
     download_file(server, clock_lock, chosen_file, dir_path, size_chunk, statistics);
     char *n_entry = strdup(chosen_file.file.fname);
     if(!n_entry) {
-        fprintf(stderr, "Erro: Falha ao acrescentar novo arquivo à lista\n");
+        fprintf(stderr, "Error: Failed appending file to list\n");
         for(int i = 0; i < files->count; i++)
             free(((ls_files *)files->elements)[i].file.fname);
         free_list(files);
@@ -190,19 +190,19 @@ void share_files_list(peer *server, pthread_mutex_t *clock_lock, SOCKET con, pee
         }
         send_complete(con, msg, strlen(msg) + 1, 0);
         sock_close(con);
-        printf("\tEncaminhando mensagem \"%.*s\" para %s:%d\n", (int)strcspn(msg, "\n"), msg, inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port));
+        printf("\tSending message \"%.*s\" to %s:%d\n", (int)strcspn(msg, "\n"), msg, inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port));
         free(llargs);
         free(msg);
         return;
     }
     lslist_msg_args *llargs = malloc(sizeof(lslist_msg_args));
     if(!llargs) {
-        fprintf(stderr, "Erro: Falha na alocacao de llargs\n");
+        fprintf(stderr, "Error: Failed allocating args\n");
         return;
     }
     llargs->list_file_len = malloc(sizeof(size_t) * files_len);
     if(!llargs->list_file_len) {
-        fprintf(stderr, "Erro: Falha na alocacao de list_file_len\n");
+        fprintf(stderr, "Error: Failed allocating args\n");
         return;
     }
     llargs->list = files;
@@ -215,7 +215,7 @@ void share_files_list(peer *server, pthread_mutex_t *clock_lock, SOCKET con, pee
     char *msg = build_message(server->con, server->p_clock, LS_LIST, (void *)llargs);
     if(msg)
         if(send_complete(con, msg, strlen(msg) + 1, 0) == 0)
-            printf("\tEncaminhando mensagem \"%.*s\" para %s:%d\n", (int)strcspn(msg, "\n"), msg, inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port));
+            printf("\tSending message \"%.*s\" to %s:%d\n", (int)strcspn(msg, "\n"), msg, inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port));
     sock_close(con);
     for(int i = 0; i < files_len; i++) {
         free(files[i]);
@@ -229,14 +229,14 @@ void share_files_list(peer *server, pthread_mutex_t *clock_lock, SOCKET con, pee
 // send file
 void send_file(peer *server, pthread_mutex_t *clock_lock, char *buf, SOCKET con, peer sender, char *dir_path) {
     if(!dir_path) {
-        fprintf(stderr, "Erro: nenhum diretorio encontrado\n");
+        fprintf(stderr, "Error: No directory found\n");
         sock_close(con);
         free(buf);
         return;
     }
     file_msg_args *fargs = malloc(sizeof(file_msg_args));
     if(!fargs) {
-        perror("Erro: falha em alloc de argumento de arquivo\n");
+        perror("Error: Failed allocating args\n");
         sock_close(con);
         free(buf);
         return;
@@ -246,14 +246,14 @@ void send_file(peer *server, pthread_mutex_t *clock_lock, char *buf, SOCKET con,
     if(a)
         free(a);
     if(!fargs->file_name) {
-        fprintf(stderr, "Erro: Impossivel encontrar arquivo requisitado\n");
+        fprintf(stderr, "Error: Failed finding requested file\n");
         free(fargs);
         sock_close(con);
         return;
     }
     char *file_path = dir_file_path(dir_path, fargs->file_name);
     if(!file_path) {
-        fprintf(stderr, "Erro: Falha criando caminho de arquivo\n");
+        fprintf(stderr, "Error: Failed creating file path\n");
         sock_close(con);
         free(fargs);
         return;
@@ -261,13 +261,13 @@ void send_file(peer *server, pthread_mutex_t *clock_lock, char *buf, SOCKET con,
     FILE *file = fopen(file_path, "rb");
     free(file_path);
     if(!file) {
-        fprintf(stderr, "Erro: Falha abrindo arquivo para compartilhar\n");
+        fprintf(stderr, "Error: Failed opening file\n");
         sock_close(con);
         free(fargs);
         return;
     }
     if(fseek(file, fargs->chunk_size * fargs->offset, SEEK_SET) < 0) {
-        perror("Erro: Falha na deslocacao do arquivo");
+        perror("Error: Failed seeking file");
         fclose(file);
         sock_close(con);
         free(fargs->file_name);
@@ -276,7 +276,7 @@ void send_file(peer *server, pthread_mutex_t *clock_lock, char *buf, SOCKET con,
     }
     char *file_cont = calloc(fargs->chunk_size, sizeof(char));
     if(!file_cont) {
-        fprintf(stderr, "Erro: Falha alocando conteudo do arquivo\n");
+        fprintf(stderr, "Error: Failed allocating file content\n");
         fclose(file);
         sock_close(con);
         free(fargs);
@@ -287,7 +287,7 @@ void send_file(peer *server, pthread_mutex_t *clock_lock, char *buf, SOCKET con,
     size_t bytes_encode = base64encode_len(bytes_read);
     char *encoded = malloc(sizeof(char) * bytes_encode);
     if(!encoded) {
-        fprintf(stderr, "Erro: Falha alocando arquivo codificado\n");
+        fprintf(stderr, "Error: Failed allocating encrypted file\n");
         sock_close(con);
         free(fargs->file_name);
         free(fargs);
@@ -295,7 +295,7 @@ void send_file(peer *server, pthread_mutex_t *clock_lock, char *buf, SOCKET con,
         return;
     }
     if(base64_encode(encoded, file_cont, bytes_read) != bytes_encode) {
-        fprintf(stderr, "Erro: Falha codificando mensagem\n");
+        fprintf(stderr, "Error: Failed encoding message\n");
         sock_close(con);
         free(encoded);
         free(fargs->file_name);
@@ -306,11 +306,11 @@ void send_file(peer *server, pthread_mutex_t *clock_lock, char *buf, SOCKET con,
     fargs->contentb64 = encoded;
     char *msg = build_message(server->con, server->p_clock, FILEMSG, (void *)fargs);
     if(msg) {
-        printf("\tEncaminhando mensagem \"%.*s\" para %s:%d\n", (int)MIN(strcspn(msg, "\n"), MSG_SIZE), msg, inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port));
+        printf("\tSending message \"%.*s\" to %s:%d\n", (int)MIN(strcspn(msg, "\n"), MSG_SIZE), msg, inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port));
         send_complete(con, msg, strlen(msg) + 1, 0);
         free(msg);
     }
-    else fprintf(stderr, "Erro: Falha ao construir mensagem de envio de arquivo\n");
+    else fprintf(stderr, "Error: Failed building message\n");
     sock_close(con);
     free(encoded);
     free(fargs->file_name);
@@ -324,7 +324,7 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
     u_short port = ntohs(sender_ip.sin_port);
     char *msg = malloc(sizeof(char) * MSG_SIZE);
     if(!msg) {
-        fprintf(stderr, "Erro: Falha na alocacao de msg\n");
+        fprintf(stderr, "Error: Failed allocating message\n");
         return NULL;
     }
     if(msg_type < 0 || msg_type > BYE) {
@@ -344,7 +344,7 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
         peer *peers = list_args->peers;
         temp = realloc(msg, sizeof(char) * msg_size_peer_list(peers_size));
         if(!temp) {
-            fprintf(stderr, "Erro: Falha na alocacao da mensagem\n");
+            fprintf(stderr, "Error: Failed allocating message\n");
             return NULL;
         }
         msg = temp;
@@ -364,7 +364,7 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
         }
         temp = realloc(msg, sizeof(char) * msg_size_files_list(llargs->list_len));
         if(!temp) {
-            fprintf(stderr, "Erro: Falha na alocacao da mensagem!\n");
+            fprintf(stderr, "Error: Failed allocating message!\n");
             return NULL;
         }
         msg = temp;
@@ -378,7 +378,7 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
         dl_msg_args *dargs = (dl_msg_args *)args;
         temp = realloc(msg, sizeof(char) * msg_size_files_list(1));
         if(!temp) {
-            fprintf(stderr, "Erro: Falha na alocacao da mensagem!\n");
+            fprintf(stderr, "Error: Failed allocating message!\n");
             return NULL;
         }
         msg = temp;
@@ -388,7 +388,7 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
         file_msg_args *fargs = (file_msg_args *)args;
         temp = realloc(msg, sizeof(char) * (msg_size_files_list(1) + base64encode_len(fargs->chunk_size)));
         if(!temp) {
-            fprintf(stderr, "Erro: Falha na alocacao da mensagem!\n");
+            fprintf(stderr, "Error: Failed allocating message!\n");
             return NULL;
         }
         msg = temp;
@@ -404,55 +404,55 @@ char *build_message(sockaddr_in sender_ip, int clock, MSG_TYPE msg_type, void *a
 // send a built message to an known peer socket
 SOCKET send_message(const char *msg, peer *neighbour) {
     if(!msg) {
-        fprintf(stderr, "\nErro: Mensagem de envio vazia!\n");
+        fprintf(stderr, "\nError: Empty message\n");
         return INVALID_SOCKET;
     }
     if(!neighbour) {
-        fprintf(stderr, "\nErro: Nenhum peer\n");
+        fprintf(stderr, "\nError: No peer found\n");
         return INVALID_SOCKET;
     }
     SOCKET server_soc = socket(AF_INET, SOCK_STREAM, 0);
     if(is_invalid_sock(server_soc)) {
-        fprintf(stderr, "\nErro: Falha na criacao do socket");
+        fprintf(stderr, "\nError: Failed creating socket");
         show_soc_error();
         return INVALID_SOCKET;
     }
     #ifdef WIN
     bool yes = true;
     if(setsockopt(server_soc, SOL_SOCKET, SO_REUSEADDR, (char*)&yes, sizeof(yes))!=0) {
-        fprintf(stderr, "\nErro: Falha definindo opcao de socket\n");
+        fprintf(stderr, "\nError: Failed defining socket option\n");
         show_soc_error();
         sock_close(server_soc);
     }
     yes = !yes;
     if(setsockopt(server_soc, SOL_SOCKET, SO_DONTLINGER, (char*)&yes, sizeof(yes))!=0) {
-        fprintf(stderr, "\nErro: Falha definindo opcao de socket\n");
+        fprintf(stderr, "\nError: Failed defining socket option\n");
         show_soc_error();
         sock_close(server_soc);
     }
     #endif
     if(connect(server_soc, (const struct sockaddr *)&(neighbour->con), sizeof(neighbour->con)) != 0) {
-        fprintf(stderr, "\nErro: Falha ao conectar ao peer\n");
+        fprintf(stderr, "\nError: Failed connecting to peer\n");
         show_soc_error();
         sock_close(server_soc);
         if(neighbour->status == ONLINE) {
             neighbour->status = OFFLINE;
-            printf("\tAtualizando peer %s:%d status %s\n", inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port), status_string[0]);
+            printf("\tUpdating peer %s:%d status %s\n", inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port), status_string[0]);
         }
         return INVALID_SOCKET;
     }
     size_t len = strlen(msg);
-    printf("\tEncaminhando mensagem \"%.*s\" para %s:%d\n", (int)strcspn(msg, "\n"), msg, inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port));
+    printf("\tSending message \"%.*s\" to %s:%d\n", (int)strcspn(msg, "\n"), msg, inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port));
     if(send_complete(server_soc, msg, len + 1, 0) == 0) {
         if(neighbour->status == OFFLINE) {
             neighbour->status = ONLINE;
-            printf("\tAtualizando peer %s:%d status %s\n", inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port), status_string[1]);
+            printf("\tUpdate peer %s:%d status %s\n", inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port), status_string[1]);
         }
     }
     else {
         if(neighbour->status == ONLINE) {
             neighbour->status = OFFLINE;
-            printf("\tAtualizando peer %s:%d status %s\n", inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port), status_string[0]);
+            printf("\tUpdate peer %s:%d status %s\n", inet_ntoa(neighbour->con.sin_addr), ntohs(neighbour->con.sin_port), status_string[0]);
         }
         show_soc_error();
     }
@@ -521,7 +521,7 @@ char *check_msg_full(const char *buf, SOCKET sock, MSG_TYPE msg_type, void *args
             case DL:;
                 char *aux_buf = calloc(msg_size_files_list(1), sizeof(char));
                 if(!aux_buf) {
-                    fprintf(stderr, "Erro: Falha na alocacao!\n");
+                    fprintf(stderr, "Error: Failed allocating\n");
                     return NULL;
                 }
                 sprintf(aux_buf, "%s", buf);
@@ -532,7 +532,7 @@ char *check_msg_full(const char *buf, SOCKET sock, MSG_TYPE msg_type, void *args
                 int spaces = 0;
                 char *duplicate = calloc(MSG_SIZE, sizeof(char));
                 if(!duplicate) {
-                    fprintf(stderr, "Erro: Falha na alocacao!\n");
+                    fprintf(stderr, "Error: Failed allocating\n");
                     return NULL;
                 }
                 int *rec_size = (int *)args;
@@ -568,7 +568,7 @@ char *check_msg_full(const char *buf, SOCKET sock, MSG_TYPE msg_type, void *args
         int spaces = 0;
         char *duplicate = calloc(MSG_SIZE, sizeof(char));
         if(!duplicate) {
-            fprintf(stderr, "Erro: Falha na alocacao!\n");
+            fprintf(stderr, "Error: Failed allocating\n");
             return NULL;
         }
         int *rec_size = (int *)args;
@@ -599,7 +599,7 @@ ArrayList *receive_files(peer *server, pthread_mutex_t *clock_lock, ArrayList *p
         update_clock(server, clock_lock, 0);
         char *msg = build_message(server->con, server->p_clock, LS, NULL);
         if(!msg) {
-            perror("Erro: Falha na construcao da mensagem!\n");
+            perror("Error: Failed building message\n");
             free_list(files);
             return NULL;
         }
@@ -611,7 +611,7 @@ ArrayList *receive_files(peer *server, pthread_mutex_t *clock_lock, ArrayList *p
         char *buf = calloc(MSG_SIZE, sizeof(char));
         ssize_t valread = recv(req, buf, MSG_SIZE - 1, 0);
         if(valread <= 0) {
-            fprintf(stderr, "\nErro: Falha lendo mensagem\n");
+            fprintf(stderr, "\nError: Failed reading message\n");
             free(buf);
             free(msg);
             continue;
@@ -629,7 +629,7 @@ ArrayList *receive_files(peer *server, pthread_mutex_t *clock_lock, ArrayList *p
         buf[valread] = '\0';
 
         if(rec_files_size == 0) {
-            printf("\tResposta recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
+            printf("\tAnswer received: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
             update_clock(server, clock_lock, sender.p_clock);
             free(buf);
             free(msg);
@@ -637,7 +637,7 @@ ArrayList *receive_files(peer *server, pthread_mutex_t *clock_lock, ArrayList *p
             continue;
         }
 
-        printf("\tResposta recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
+        printf("\tAnswer received: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
         update_clock(server, clock_lock, sender.p_clock);
         printf("\n");
         append_files_list(buf, files, sender, rec_files_size);
@@ -652,10 +652,10 @@ void print_files_received(ArrayList *files) {
     if(!files)
         return;
     if(files->size_elements != sizeof(ls_files)) {
-        fprintf(stderr, "Erro: Tipo de lista inesperado\n");
+        fprintf(stderr, "Error: Unexpected list type\n");
     }
     uint16_t max_fname_size = 10;
-    uint16_t max_fsize_size = 7;
+    uint16_t max_fsize_size = 4;
     for(int i = 0; i < files->count; i++) {
         uint16_t s_f = strlen(((ls_files *)files->elements)[i].file.fname);
         uint16_t s_s = (uint16_t)log10(((ls_files *)files->elements)[i].file.fsize) + 1;
@@ -667,14 +667,14 @@ void print_files_received(ArrayList *files) {
     uint16_t count_size = floor(log10(files->count)) + 1;
     // print header
     printf("%*.s ", count_size + 2, "");
-    printf("%-*s ", max_fname_size, "Nome");
+    printf("%-*s ", max_fname_size, "Name");
     printf("|");
-    printf(" %-*s ", max_fsize_size, "Tamanho");
+    printf(" %-*s ", max_fsize_size, "Size");
     printf("|");
     printf(" %s\n", "Peer");
     // print cancel
     printf("[%0*d] ", count_size, 0);
-    printf("%-*s ", max_fname_size, "<Cancelar>");
+    printf("%-*s ", max_fname_size, "<Cancel>");
     printf("|");
     printf(" %*.s ", max_fsize_size, "");
     printf("|");
@@ -726,7 +726,7 @@ void *download_file_thread(void *args) {
             patience = 0;
         }
         if(holders_list->count <= 0) {
-            fprintf(stderr, "\nErro: Falha ao baixar arquivo, # maximo de tentativas feitas\n");
+            fprintf(stderr, "\nError: Failed downloading file, maximum # of tries exceeded\n");
             free_list(holders_list);
             free(fname);
             fclose(file);
@@ -737,7 +737,7 @@ void *download_file_thread(void *args) {
         peer req_peer = holders[ppos];
         dl_msg_args *dargs = malloc(sizeof(*dargs));
         if(!dargs) {
-            perror("Erro: Falha alocando argumento de arquivo\n");
+            perror("Error: Failed allocating args\n");
             patience++;
             continue;
         }
@@ -763,7 +763,7 @@ void *download_file_thread(void *args) {
         size_t temp_size = MSG_SIZE + 26 + base64encode_len(chunk) + 1;
         char *buf = calloc(temp_size, sizeof(char));
         if(!buf) {
-            perror("\nErro: Falha na alocacao de recebimento ao requisitar %d\n");
+            perror("\nError: Failed allocating receiving buffer\n");
             sock_close(req);
             continue;
         }
@@ -772,7 +772,7 @@ void *download_file_thread(void *args) {
         while(total_received < temp_size) {
             ssize_t valread = recv(req, buf + total_received, temp_size - total_received, 0);
             if(valread < 0) {
-                fprintf(stderr, "\nErro: Falha no recebimento\n");
+                fprintf(stderr, "\nError: Failed receiving\n");
                 show_soc_error();
                 free(buf);
                 buf = 0;
@@ -797,7 +797,7 @@ void *download_file_thread(void *args) {
             continue;
         }
         if(total_received == 0) {
-            fprintf(stderr, "Erro: Mensagem mal formatada\n");
+            fprintf(stderr, "Error: Bad formatted message\n");
             free(buf);
             sock_close(req);
             patience++;
@@ -806,7 +806,7 @@ void *download_file_thread(void *args) {
         buf[total_received] = 0;
         sock_close(req);
         printf("\n");
-        printf("\n\tResposta recebida:  \"%.*s\"\n", (int)MIN(strcspn(buf, "\n"), MSG_SIZE), buf);
+        printf("\n\tAnswer received:  \"%.*s\"\n", (int)MIN(strcspn(buf, "\n"), MSG_SIZE), buf);
 
         int rec_chunk, soffset;
         int clock = 0;
@@ -814,25 +814,25 @@ void *download_file_thread(void *args) {
         free(buf);
         update_clock(server, lock, clock);
         if(!file_b64) {
-            fprintf(stderr, "Erro: Falha no recebimento do arquivo\n");
+            fprintf(stderr, "Error: Failed receiving file\n");
             patience++;
             continue;
         }
         if(soffset != offset || rec_chunk > chunk) {
-            fprintf(stderr, "Erro: Mensagem inesperada\n");
+            fprintf(stderr, "Error: Unexpected message\n");
             free(file_b64);
             continue;
         }
         size_t clen = base64decode_len(file_b64);
         char *file_decoded = malloc(sizeof(char) * (clen + 1));
         if(!file_decoded) {
-            fprintf(stderr, "Erro: Falha na alocacao\n");
+            fprintf(stderr, "Error: Failed allocating\n");
             free(file_b64);
             continue;
         }
         int decode_size = base64_decode(file_decoded, file_b64);
         if(fseek(file, offset * chunk, SEEK_SET) != 0) {
-            perror("Erro: Falha na deslocacao do arquivo\n");
+            perror("Error: Failed seeking file\n");
             free(file_decoded);
             free(file_b64);
             patience++;
@@ -840,7 +840,7 @@ void *download_file_thread(void *args) {
         }
         size_t w = fwrite(file_decoded, 1, decode_size, file);
         if(w != decode_size) {
-            fprintf(stderr, "Erro: Falha com escrita em arquivo: esperava %d, escreveu %d\n", decode_size, (int)w);
+            fprintf(stderr, "Error: Failed writing file: expected %d, written %d\n", decode_size, (int)w);
             free(file_b64);
             free(file_decoded);
             patience++;
@@ -947,7 +947,7 @@ void append_files_list(const char *buf, ArrayList *list, peer sender, size_t rec
     char *list_rec = strtok_r(NULL, "\n", &svptr);
 
     if(!list_rec) {
-        fprintf(stderr, "Erro: Lista de arquivos nao encontrada!\n");
+        fprintf(stderr, "Error: Files list not found\n");
         free(cpy);
         return;
     }
@@ -1059,19 +1059,19 @@ void print_statistics(ArrayList *statistics) {
     if(!statistics)
         return;
     if(statistics->size_elements != sizeof(stat_block)) {
-        fprintf(stderr, "Erro: Tipo de lista inesperado\n");
+        fprintf(stderr, "Error: Unexpected list type\n");
         return;
     }
     if(statistics->count == 0) {
-        printf("Nenhuma estatistica obtida ainda\n");
+        printf("No statistic found yet\n");
         return;
     }
     stat_block *lsf = (stat_block*)statistics->elements;
     uint16_t max_chunk_size = 10;
     uint16_t max_npeers = 7;
-    uint16_t max_file_size = 12;
+    uint16_t max_file_size = 9;
     uint16_t max_n = 1;
-    uint16_t max_time = 9;
+    uint16_t max_time = 8;
     uint8_t precision = 4;
     for(int i = 0; i < statistics->len; i++) {
         max_chunk_size = MAX(max_chunk_size, log10l(lsf[i].chunk_used) + 1);
@@ -1081,17 +1081,17 @@ void print_statistics(ArrayList *statistics) {
         max_time = MAX(max_time, log10l(lsf[i].avrg) + 1);
     }
     // print header
-    printf("%-*s ", max_chunk_size, "Tam. chunk");
+    printf("%-*s ", max_chunk_size, "Chunk size");
     printf("|");
     printf(" %*s ", max_npeers, "N peers");
     printf("|");
-    printf(" %*s ", max_file_size, "Tam. arquivo");
+    printf(" %*s ", max_file_size, "File size");
     printf("|");
     printf(" %*s ", max_n, "N");
     printf("|");
-    printf(" %*s ", max_time, "Tempo [s]");
+    printf(" %*s ", max_time, "Time [s]");
     printf("|");
-    printf(" %s \n", "Desvio");
+    printf(" %s \n", "Deviation");
     // print list
     for(int i = 0; i < statistics->count; i++) {
         printf("%-*d ", max_chunk_size, lsf[i].chunk_used);
@@ -1105,23 +1105,22 @@ void print_statistics(ArrayList *statistics) {
         printf(" %*.*lf ", max_time, precision, lsf[i].avrg);
         printf("|");
         printf(" %.*lf ", precision, lsf[i].std_dev);
-        printf("|");
         printf("\n");
     }
 }
 
 // change the local chunk_size
 void change_chunk_size(int *chunk_size) {
-    printf("\nDigite novo tamanho de chunk:\n>");
+    printf("\nInput new chunk size:\n>");
     int input;
     if(scanf("%d", &input) != 1) {
         while(getchar() != '\n')
             ;
-        fprintf(stderr, "Erro: Entrada invalida! Tente de novo.\n");
+        fprintf(stderr, "Error: Invalid input! Try again.\n");
         return;
     }
     else if(input <= 0) {
-        fprintf(stderr, "A entrada deve ser maior que 0! Tente de novo.\n");
+        fprintf(stderr, "Input must be bigger than 0! Try again.\n");
         return;
     }
     else *chunk_size = input;
@@ -1131,7 +1130,7 @@ void change_chunk_size(int *chunk_size) {
 void bye_peers(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers) {
     SOCKET server_soc = socket(AF_INET, SOCK_STREAM, 0);
     if(is_invalid_sock(server_soc)) {
-        fprintf(stderr, "\nErro: Falha na criacao do socket");
+        fprintf(stderr, "\nError: Failed creating socket");
         show_soc_error();
         return;
     }

@@ -10,7 +10,7 @@ int init_win_sock(void) {
     WSADATA d;
     int iResult = WSAStartup(MAKEWORD(2, 2), &d);
     if(iResult != 0) {
-        fprintf(stderr, "Falha na inicializacao. %d\n", WSAGetLastError());
+        fprintf(stderr, "Failed initializing. %d\n", WSAGetLastError());
         return 1;
     }
     return iResult;

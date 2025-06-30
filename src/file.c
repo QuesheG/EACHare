@@ -53,7 +53,7 @@ char **read_peers(FILE *f, size_t *len) {
 char **get_dir_files(const char *dir_path, size_t *len) {
     DIR *dir = opendir(dir_path);
     if(!dir) {
-        perror("Erro: Diretorio nao achado, cheque escrita ou existencia do diretorio");
+        perror("Error: Directory not found");
         return NULL;
     }
     char **files = NULL;
@@ -105,7 +105,7 @@ char *dir_file_path(const char *dir_path, const char *file_name) {
     size_t ch_file_size = strlen(file_name);
     char *file_path = malloc(sizeof(char) * (ch_file_size + d_path_size + 2));
     if(!file_path) {
-        fprintf(stderr, "Erro: Falha alocando caminho do arquivo\n");
+        fprintf(stderr, "Error: Failed file path allocation\n");
         return NULL;
     }
     strncpy(file_path, dir_path, d_path_size);
@@ -118,7 +118,7 @@ char *dir_file_path(const char *dir_path, const char *file_name) {
 int fsize(const char *file) {
     FILE *fp = fopen(file, "rb");
     if(!fp) {
-        fprintf(stderr, "Erro: Falha lendo arquivo!\n");
+        fprintf(stderr, "Error: Failed opening file\n");
         return -1;
     }
     fseek(fp, 0L, SEEK_END);
@@ -134,6 +134,6 @@ bool make_file_size(FILE *fp, uint64_t fsize) {
     #else
     res = ftruncate(fileno(fp), fsize);
     #endif
-    if(res < 0) perror("Erro: Falha criando arquivo");
+    if(res < 0) perror("Error: Failed creating file");
     return res == 0;
 }

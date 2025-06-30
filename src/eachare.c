@@ -29,7 +29,7 @@ void *treat_request(void *args)
     ssize_t valread = recv(n_sock, buf, MSG_SIZE - 1, 0);
 
     if(valread <= 0) {
-        perror("Erro: Falha lendo mensagem de vizinho\n");
+        perror("Error: Failed reading neighbour message\n");
         free(args);
         sock_close(n_sock);
         free(buf);
@@ -39,7 +39,7 @@ void *treat_request(void *args)
     peer sender;
     MSG_TYPE msg_type = read_message(buf, &sender);
     if(msg_type == UNEXPECTED_MSG_TYPE) {
-        fprintf(stderr, "Erro: Falha com mensagem de vizinho\n");
+        fprintf(stderr, "Error: Unexpected neighbour message\n");
         free(buf);
         sock_close(n_sock);
         free(args);
@@ -55,7 +55,7 @@ void *treat_request(void *args)
 
     buf[valread] = '\0';
     printf("\n");
-    printf("\tMensagem recebida: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
+    printf("\tReceived message: \"%.*s\"\n", (int)strcspn(buf, "\n"), buf);
     update_clock(server, &clock_lock, sender.p_clock);
 
     int i = peer_in_list(sender, (peer *)peers->elements, peers->count);
@@ -69,7 +69,7 @@ void *treat_request(void *args)
     if (((peer *)peers->elements)[i].status == OFFLINE && msg_type != BYE)
     {
         ((peer *)peers->elements)[i].status = ONLINE;
-        printf("\tAtualizando peer %s:%d status %s\n", inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port), status_string[1]);
+        printf("\tUpdating peer %s:%d status %s\n", inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port), status_string[1]);
         ((peer *)peers->elements)[i].p_clock = MAX(((peer *)peers->elements)[i].p_clock, sender.p_clock);
     }
     switch (msg_type)
@@ -87,7 +87,7 @@ void *treat_request(void *args)
         if (sender.status == ONLINE)
         {
             ((peer *)peers->elements)[i].status = OFFLINE;
-            printf("\tAtualizando peer %s:%d status %s\n", inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port), status_string[0]);
+            printf("\tUpdating peer %s:%d status %s\n", inet_ntoa(sender.con.sin_addr), ntohs(sender.con.sin_port), status_string[0]);
         }
         break;
     default:
@@ -118,13 +118,13 @@ void *listen_socket(void *args)
     int opt = 1;
     SOCKET server_soc;
     if (!create_server(&server_soc, server->con, opt)) {
-        fprintf(stderr, "\nErro: Falha com criacao de server\n");
+        fprintf(stderr, "\nError: Failed creating server\n");
         show_soc_error();
         return NULL;
     }
     set_sock_block(server_soc, false);
     if (listen(server_soc, 3) != 0) {
-        fprintf(stderr, "\nErro: Falha colocando socket para escutar\n");
+        fprintf(stderr, "\nError: Failed making server listen\n");
         show_soc_error();
         return NULL;
     }
@@ -147,13 +147,13 @@ int main(int argc, char **argv)
 {
     if (argc != 4)
     {
-        fprintf(stderr, "Argumentos errados!\nEsperado: %s <endereco>:<porta> <vizinhos.txt> <diretorio_compartilhado>", argv[0]);
+        fprintf(stderr, "Wrong usage!\nExpected: %s <address>:<port> <neighbours.txt> <shared_directory>", argv[0]);
         return 1;
     }
 #ifdef WIN
     if (init_win_sock())
     {
-        fprintf(stderr, "Erro: Falha criando socket Windows\n");
+        fprintf(stderr, "Error: Failed creating Windows socket\n");
         show_soc_error();
         return 1;
     }
@@ -161,7 +161,7 @@ int main(int argc, char **argv)
 
     if (pthread_mutex_init(&clock_lock, NULL) != 0)
     {
-        perror("Erro: Falha ao inicializar o mutex");
+        perror("Error: Failed initiaing mutex");
         return EXIT_FAILURE;
     }
 
@@ -175,7 +175,7 @@ int main(int argc, char **argv)
 
     if (!peers || !peers_txt || !files)
     {
-        fprintf(stderr, "Erro: falha na alocação de memoria\n");
+        fprintf(stderr, "Error: Failed initial memory allocation\n");
         return 1;
     }
 
@@ -190,7 +190,7 @@ int main(int argc, char **argv)
     FILE *f = fopen(argv[2], "r");
     if (!f)
     {
-        fprintf(stderr, "Erro: Falha abrindo arquivo %s\n", argv[2]);
+        fprintf(stderr, "Error: Failed opening file %s\n", argv[2]);
         perror(NULL);
         return 1;
     }
@@ -215,20 +215,20 @@ int main(int argc, char **argv)
 
     while (!should_quit)
     {
-        printf("Escolha um comando:\n"
-               "\t[1] Listar peers\n"
-               "\t[2] Obter peers\n"
-               "\t[3] Listar arquivos locais\n"
-               "\t[4] Buscar arquivos\n"
-               "\t[5] Exibir estatisticas\n"
-               "\t[6] Alterar tamanho da chunk\n"
-               "\t[9] Sair\n");
+        printf("Pick a command:\n"
+               "\t[1] List peers\n"
+               "\t[2] Get peers\n"
+               "\t[3] List local files\n"
+               "\t[4] Search files\n"
+               "\t[5] Show statistics\n"
+               "\t[6] Change chunk size\n"
+               "\t[9] Quit\n");
         printf(">");
         if (scanf("%d", &comm) != 1)
         {
             while (getchar() != '\n')
                 ;
-            printf("Comando inesperado\n");
+            printf("Unexpected command\n");
             continue;
         }
         switch (comm)
@@ -250,16 +250,16 @@ int main(int argc, char **argv)
             break;
         case 6:
             change_chunk_size(&chunk_size);
-            printf("\tTamanho de chunk alterado: %d\n", chunk_size);
+            printf("\tChanged chunk size: %d\n", chunk_size);
             break;
         case 9:
-            printf("Saindo...\n");
+            printf("Quiting...\n");
             should_quit = true;
             pthread_cancel(listener_thread);
             pthread_join(listener_thread, NULL);
             break;
         default:
-            printf("Comando inesperado\n");
+            printf("Unexpected command\n");
             break;
         }
     }

@@ -40,18 +40,18 @@ bool create_server(SOCKET *server, sockaddr_in address, int opt)
     *server = socket(AF_INET, SOCK_STREAM, 0);
     if (is_invalid_sock(*server))
     {
-        fprintf(stderr, "Erro: Falha na criacao do socket.\n");
+        fprintf(stderr, "Error: Failed upon socket creation\n");
         return false;
     }
     if (setsockopt(*server, SOL_SOCKET, SO_REUSEADDR, (const char *)&opt, sizeof(opt)) != 0)
     {
-        fprintf(stderr, "Erro: Falha ao criar servidor\n");
+        fprintf(stderr, "Error: Failed making server\n");
         show_soc_error();
         return false;
     }
     if (bind(*server, (const struct sockaddr *)&address, sizeof(address)) != 0)
     {
-        fprintf(stderr, "Erro: Falha ao ligar servidor\n");
+        fprintf(stderr, "Error: Failed connecting server\n");
         show_soc_error();
         return false;
     }
@@ -63,7 +63,7 @@ void create_peers(ArrayList *peers, ArrayList *peers_txt)
 {
     for (int i = 0; i < peers_txt->count; i++)
     {
-        printf("Adicionando novo peer %s status %s\n", ((char **)peers_txt->elements)[i], status_string[0]);
+        printf("Adding new peer %s status %s\n", ((char **)peers_txt->elements)[i], status_string[0]);
         peer np = {0};
         create_address(&np, ((char **)peers_txt->elements)[i], 0);
         append_element(peers, (void *)&np);
@@ -78,7 +78,7 @@ int append_peer(ArrayList *peers, peer new_peer, int *i /*, char *file*/)
     // FILE *f = fopen(file, "a");
     // fprintf(f, "%s:%d\n", inet_ntoa((*peers)[(*i)].con.sin_addr), ntohs((*peers)[(*i)].con.sin_port));
     // fclose(f);
-    printf("\tAdicionando novo peer %s:%d status %s\n", inet_ntoa(((peer *)peers->elements)[*i].con.sin_addr), ntohs(((peer *)peers->elements)[*i].con.sin_port), status_string[((peer *)peers->elements)[*i].status]);
+    printf("\tAdding new peer %s:%d status %s\n", inet_ntoa(((peer *)peers->elements)[*i].con.sin_addr), ntohs(((peer *)peers->elements)[*i].con.sin_port), status_string[((peer *)peers->elements)[*i].status]);
 
     return 1;
 }
@@ -105,7 +105,7 @@ void append_list_peers(const char *buf, ArrayList *peers, size_t rec_peers_size 
     char *list = strtok_r(NULL, "\n", &svptr);
 
     if(!list) {
-        fprintf(stderr, "Lista de peers vazia!\n");
+        fprintf(stderr, "Error: Empty peer list\n");
         free(cpy);
         return;
     }
@@ -114,7 +114,7 @@ void append_list_peers(const char *buf, ArrayList *peers, size_t rec_peers_size 
     peer *rec_peers_list = malloc(sizeof(peer) * rec_peers_size);
 
     if(!rec_peers_list) {
-        fprintf(stderr, "Erro: Falha na alocacao de rec_peers_list");
+        fprintf(stderr, "Error: Failed allocating received peer list");
         free(cpy);
         return;
     }
@@ -174,7 +174,7 @@ void update_clock(peer *a, pthread_mutex_t *clock_lock, uint64_t n_clock)
     pthread_mutex_lock(clock_lock);
     a->p_clock = MAX(a->p_clock, n_clock) + 1;
     pthread_mutex_unlock(clock_lock);
-    printf("\t=> Atualizando relogio para %" PRIu64 "\n", a->p_clock);
+    printf("\t=> Updating clock to %" PRIu64 "\n", a->p_clock);
 }
 
 #ifdef WIN
