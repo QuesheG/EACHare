@@ -46,7 +46,7 @@ void show_peers(peer *server, pthread_mutex_t *clock_lock, ArrayList *peers) {
         }
         peer *chosen = &(((peer*)peers->elements)[input-1]);
         SOCKET s = send_message(msg, chosen);
-        if(!is_invalid_sock(s)) sock_close(s);
+        if(is_invalid_sock(s)) sock_close(s);
         free(msg);
     }
     else {
